@@ -1,0 +1,28 @@
+name: Basic Load Test
+
+stages:
+  - duration: 30s
+    target_vus: 50
+  - duration: 1m
+    target_vus: 200
+  - duration: 30s
+    target_vus: 50
+
+http:
+  base_url: "http://target-service:8080"
+  timeout: 30s
+  requests:
+    - method: GET
+      path: /api/health
+      assertions:
+        - status_code: 200
+        - response_time_p99_ms: 500
+    - method: GET
+      path: /api/users
+      think_time: 100ms
+      assertions:
+        - status_code: 200
+        - response_time_p95_ms: 1000
+
+variables:
+  api_key: "${API_KEY}"

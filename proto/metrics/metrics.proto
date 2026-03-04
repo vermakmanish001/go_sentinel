@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package metrics;
+
+option go_package = "github.com/vermakmanish001/go_sentinel/proto/metrics";
+
+// Metric snapshot containing aggregated metrics
+message MetricSnapshot {
+  RPSSnapshot rps = 1;
+  LatencyHistogram latency = 2;
+  ErrorRate error_rate = 3;
+  int64 total_requests = 4;
+  int64 total_errors = 5;
+  int64 timestamp_ms = 6;
+  string worker_id = 7; // empty for aggregated metrics
+}
+
+// Requests per second snapshot
+message RPSSnapshot {
+  double current = 1;
+  double average = 2;
+  double peak = 3;
+  int64 window_seconds = 4;
+}
+
+// Latency histogram with percentiles
+message LatencyHistogram {
+  int64 min_ms = 1;
+  int64 max_ms = 2;
+  int64 mean_ms = 3;
+  int64 p50_ms = 4;
+  int64 p95_ms = 5;
+  int64 p99_ms = 6;
+  int64 p999_ms = 7;
+  int64 count = 8;
+}
+
+// Error rate metrics
+message ErrorRate {
+  double rate = 1; // errors per second
+  double percentage = 2; // error percentage
+  map<int32, int64> status_code_counts = 3; // status code -> count
+  repeated string error_messages = 4; // sample error messages
+}
+
+// Individual metric point
+message MetricPoint {
+  string name = 1;
+  double value = 2;
+  int64 timestamp_ms = 3;
+  map<string, string> labels = 4;
+}
+
+// Metric batch from a worker
+message MetricBatch {
+  string worker_id = 1;
+  repeated MetricPoint points = 2;
+  LatencyHistogram latency_histogram = 3;
+  RPSSnapshot rps_snapshot = 4;
+  ErrorRate error_rate = 5;
+  int64 batch_timestamp_ms = 6;
+}

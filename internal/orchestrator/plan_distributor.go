@@ -1,0 +1,199 @@
+package orchestrator
+
+import (
+	"context"
+	"fmt"
+	"sync"
+
+	"go.uber.org/zap"
+
+	"github.com/vermakmanish001/go_sentinel/pkg/models"
+)
+
+// PlanDistributor distributes test plans across worker nodes
+type PlanDistributor struct {
+	nodeManager *NodeManager
+	logger      *zap.Logger
+	mu          sync.RWMutex
+	activeTests map[string]*ActiveTest
+}
+
+// ActiveTest represents an active test
+type ActiveTest struct {
+	TestID      string
+	Plan        *models.TestPlan
+	Workers     map[string]int32 // worker_id -> assigned VUs
+	Status      models.TestStatus
+	mu          sync.RWMutex
+}
+
+// NewPlanDistributor creates a new plan distributor
+func NewPlanDistributor(nodeManager *NodeManager, logger *zap.Logger) *PlanDistributor {
+	return &PlanDistributor{
+		nodeManager: nodeManager,
+		logger:      logger,
+		activeTests: make(map[string]*ActiveTest),
+	}
+}
+
+// DistributePlan distributes a test plan across available workers
+func (pd *PlanDistributor) DistributePlan(ctx context.Context, testID string, plan *models.TestPlan) (map[string]int32, error) {
+	pd.mu.Lock()
+	defer pd.mu.Unlock()
+
+	// Get available nodes
+	nodes := pd.nodeManager.GetNodes()
+	if len(nodes) == 0 {
+		return nil, fmt.Errorf("no worker nodes available")
+	}
+
+	// Calculate total VUs needed
+	totalVUs := int32(0)
+	for _, stage := range plan.Stages {
+		if stage.TargetVUs > totalVUs {
+			totalVUs = stage.TargetVUs
+		}
+	}
+
+	// Distribute VUs across nodes using consistent hashing
+	distribution := make(map[string]int32)
+	remainingVUs := totalVUs
+
+	// Calculate capacity
+	totalCapacity := int32(0)
+	for _, node := range nodes {
+		totalCapacity += node.MaxVUs
+	}
+
+	if totalCapacity < totalVUs {
+		return nil, fmt.Errorf("insufficient worker capacity: need %d, have %d", totalVUs, totalCapacity)
+	}
+
+	// Distribute proportionally based on capacity
+	for _, node := range nodes {
+		if remainingVUs <= 0 {
+			break
+		}
+
+		// Calculate proportional share
+		share := (float64(node.MaxVUs) / float64(totalCapacity)) * float64(totalVUs)
+		assigned := int32(share)
+		
+		// Ensure we don't exceed node capacity or remaining VUs
+		if assigned > node.MaxVUs {
+			assigned = node.MaxVUs
+		}
+		if assigned > remainingVUs {
+			assigned = remainingVUs
+		}
+
+		if assigned > 0 {
+			distribution[node.ID] = assigned
+			remainingVUs -= assigned
+		}
+	}
+
+	// Distribute any remaining VUs
+	if remainingVUs > 0 {
+		for _, node := range nodes {
+			if remainingVUs <= 0 {
+				break
+			}
+
+			available := node.MaxVUs - distribution[node.ID]
+			if available > 0 {
+				assigned := remainingVUs
+				if assigned > available {
+					assigned = available
+				}
+				distribution[node.ID] += assigned
+				remainingVUs -= assigned
+			}
+		}
+	}
+
+	// Store active test
+	pd.activeTests[testID] = &ActiveTest{
+		TestID:  testID,
+		Plan:    plan,
+		Workers: distribution,
+		Status:  models.TestStatusRunning,
+	}
+
+	pd.logger.Info("plan distributed",
+		zap.String("test_id", testID),
+		zap.Int32("total_vus", totalVUs),
+		zap.Int("workers", len(distribution)),
+	)
+
+	return distribution, nil
+}
+
+// GetActiveTest returns an active test
+func (pd *PlanDistributor) GetActiveTest(testID string) (*ActiveTest, bool) {
+	pd.mu.RLock()
+	defer pd.mu.RUnlock()
+	test, ok := pd.activeTests[testID]
+	return test, ok
+}
+
+// RemoveActiveTest removes an active test
+func (pd *PlanDistributor) RemoveActiveTest(testID string) {
+	pd.mu.Lock()
+	defer pd.mu.Unlock()
+	delete(pd.activeTests, testID)
+}
+
+// RebalanceTest rebalances a test when a worker fails
+func (pd *PlanDistributor) RebalanceTest(ctx context.Context, testID string, failedWorkerID string) error {
+	pd.mu.Lock()
+	defer pd.mu.Unlock()
+
+	test, ok := pd.activeTests[testID]
+	if !ok {
+		return fmt.Errorf("test not found: %s", testID)
+	}
+
+	// Get VUs that were on the failed worker
+	reassignedVUs := test.Workers[failedWorkerID]
+	delete(test.Workers, failedWorkerID)
+
+	// Redistribute to remaining workers
+	nodes := pd.nodeManager.GetNodes()
+	availableNodes := make([]*models.WorkerNode, 0)
+	for _, node := range nodes {
+		if node.ID != failedWorkerID {
+			availableNodes = append(availableNodes, node)
+		}
+	}
+
+	if len(availableNodes) == 0 {
+		return fmt.Errorf("no available workers for rebalancing")
+	}
+
+	// Distribute proportionally
+	remaining := reassignedVUs
+	for _, node := range availableNodes {
+		if remaining <= 0 {
+			break
+		}
+
+		available := node.MaxVUs - test.Workers[node.ID]
+		if available > 0 {
+			assigned := remaining
+			if assigned > available {
+				assigned = available
+			}
+			test.Workers[node.ID] += assigned
+			remaining -= assigned
+		}
+	}
+
+	pd.logger.Info("test rebalanced",
+		zap.String("test_id", testID),
+		zap.String("failed_worker", failedWorkerID),
+		zap.Int32("reassigned_vus", reassignedVUs),
+	)
+
+	return nil
+}

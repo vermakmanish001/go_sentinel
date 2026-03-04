@@ -1,0 +1,151 @@
+syntax = "proto3";
+
+package orchestrator;
+
+option go_package = "github.com/vermakmanish001/go_sentinel/proto/orchestrator";
+
+import "proto/metrics.proto";
+
+// Orchestrator service for managing distributed load tests
+service OrchestratorService {
+  // Submit a test plan to be distributed across workers
+  rpc DistributeTestPlan(DistributeRequest) returns (DistributeResponse);
+  
+  // Stream aggregated metrics from all workers
+  rpc StreamMetrics(StreamMetricsRequest) returns (stream StreamMetricsResponse);
+  
+  // Register a worker node
+  rpc RegisterWorker(RegisterWorkerRequest) returns (RegisterWorkerResponse);
+  
+  // Get current test status
+  rpc GetTestStatus(TestStatusRequest) returns (TestStatusResponse);
+  
+  // Stop a running test
+  rpc StopTest(StopTestRequest) returns (StopTestResponse);
+}
+
+// Test plan definition
+message TestPlan {
+  string id = 1;
+  string name = 2;
+  repeated Stage stages = 3;
+  HTTPConfig http = 4;
+  map<string, string> variables = 5;
+  int32 total_virtual_users = 6;
+}
+
+// Load test stage
+message Stage {
+  string duration = 1; // e.g., "30s", "1m"
+  int32 target_vus = 2;
+  string ramp_up = 3; // optional, e.g., "5s"
+}
+
+// HTTP configuration
+message HTTPConfig {
+  string base_url = 1;
+  repeated Request requests = 2;
+  map<string, string> headers = 3;
+  int32 timeout_ms = 4;
+}
+
+// HTTP request definition
+message Request {
+  string method = 1; // GET, POST, PUT, DELETE, etc.
+  string path = 2;
+  map<string, string> headers = 3;
+  bytes body = 4;
+  repeated Assertion assertions = 5;
+  int32 think_time_ms = 6; // time to wait after request
+}
+
+// Response assertion
+message Assertion {
+  oneof assertion {
+    StatusCodeAssertion status_code = 1;
+    ResponseTimeAssertion response_time = 2;
+    BodyContainsAssertion body_contains = 3;
+  }
+}
+
+message StatusCodeAssertion {
+  int32 expected = 1;
+}
+
+message ResponseTimeAssertion {
+  string percentile = 1; // P50, P95, P99
+  int32 max_ms = 2;
+}
+
+message BodyContainsAssertion {
+  string substring = 1;
+}
+
+// Distribute test plan request
+message DistributeRequest {
+  TestPlan plan = 1;
+}
+
+// Distribute test plan response
+message DistributeResponse {
+  string test_id = 1;
+  int32 workers_assigned = 2;
+  map<string, int32> worker_vu_distribution = 3; // worker_id -> virtual_users
+}
+
+// Stream metrics request
+message StreamMetricsRequest {
+  string test_id = 1;
+}
+
+// Stream metrics response
+message StreamMetricsResponse {
+  metrics.MetricSnapshot snapshot = 1;
+  int64 timestamp_ms = 2;
+}
+
+// Register worker request
+message RegisterWorkerRequest {
+  string worker_id = 1;
+  string address = 2;
+  int32 max_vus = 3;
+  map<string, string> metadata = 4;
+}
+
+// Register worker response
+message RegisterWorkerResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Test status request
+message TestStatusRequest {
+  string test_id = 1;
+}
+
+// Test status response
+message TestStatusResponse {
+  enum Status {
+    UNKNOWN = 0;
+    PENDING = 1;
+    RUNNING = 2;
+    COMPLETED = 3;
+    FAILED = 4;
+    STOPPED = 5;
+  }
+  Status status = 1;
+  int32 active_workers = 2;
+  int32 total_vus = 3;
+  metrics.MetricSnapshot current_metrics = 4;
+}
+
+// Stop test request
+message StopTestRequest {
+  string test_id = 1;
+}
+
+// Stop test response
+message StopTestResponse {
+  bool success = 1;
+  string message = 2;
+}

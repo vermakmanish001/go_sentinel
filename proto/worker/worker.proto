@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package worker;
+
+option go_package = "github.com/vermakmanish001/go_sentinel/proto/worker";
+
+import "proto/orchestrator.proto";
+
+// Worker service for executing load tests
+service WorkerService {
+  // Execute a test plan on this worker
+  rpc RunTest(RunRequest) returns (RunResponse);
+  
+  // Send heartbeat to orchestrator
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  
+  // Get worker status
+  rpc GetStatus(StatusRequest) returns (StatusResponse);
+  
+  // Stop current test
+  rpc StopTest(StopRequest) returns (StopResponse);
+}
+
+// Run test request
+message RunRequest {
+  string test_id = 1;
+  orchestrator.TestPlan plan = 2;
+  int32 assigned_vus = 3; // number of virtual users assigned to this worker
+  string worker_id = 4;
+}
+
+// Run test response
+message RunResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Worker status
+message WorkerStatus {
+  enum Status {
+    IDLE = 0;
+    RUNNING = 1;
+    STOPPING = 2;
+    ERROR = 3;
+  }
+  Status status = 1;
+  string current_test_id = 2;
+  int32 active_vus = 3;
+  int64 uptime_seconds = 4;
+  map<string, string> metadata = 5;
+}
+
+// Heartbeat request
+message HeartbeatRequest {
+  string worker_id = 1;
+  WorkerStatus status = 2;
+}
+
+// Heartbeat response
+message HeartbeatResponse {
+  bool acknowledged = 1;
+  string message = 2;
+}
+
+// Status request
+message StatusRequest {
+  string worker_id = 1;
+}
+
+// Status response
+message StatusResponse {
+  WorkerStatus status = 1;
+}
+
+// Stop request
+message StopRequest {
+  string test_id = 1;
+}
+
+// Stop response
+message StopResponse {
+  bool success = 1;
+  string message = 2;
+}

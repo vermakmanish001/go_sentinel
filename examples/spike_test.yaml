@@ -1,0 +1,22 @@
+name: Spike Test
+
+stages:
+  - duration: 10s
+    target_vus: 10
+    ramp_up: 5s
+  - duration: 5s
+    target_vus: 1000
+    ramp_up: 2s
+  - duration: 10s
+    target_vus: 10
+    ramp_up: 5s
+
+http:
+  base_url: "http://target-service:8080"
+  timeout: 30s
+  requests:
+    - method: GET
+      path: /api/health
+      assertions:
+        - status_code: 200
+        - response_time_p99_ms: 1000
