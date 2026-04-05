@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/charmbracelet/bubbletea"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/vermakmanish001/go_sentinel/pkg/models"
@@ -25,8 +25,8 @@ type Model struct {
 // tickMsg is sent periodically to update the view
 type tickMsg time.Time
 
-// metricsUpdateMsg updates metrics
-type metricsUpdateMsg models.MetricSnapshot
+// MetricsUpdateMsg updates metrics
+type MetricsUpdateMsg models.MetricSnapshot
 
 // nodesUpdateMsg updates nodes
 type nodesUpdateMsg []*models.WorkerNode
@@ -44,16 +44,16 @@ func NewModel(testID string) *Model {
 }
 
 // Init initializes the model
-func (m *Model) Init() bubbletea.Cmd {
-	return bubbletea.Batch(
+func (m *Model) Init() tea.Cmd {
+	return tea.Batch(
 		m.tick(),
 	)
 }
 
 // Update updates the model
-func (m *Model) Update(msg bubbletea.Msg) (bubbletea.Model, bubbletea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case bubbletea.WindowSizeMsg:
+	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		m.metricsView.SetSize(msg.Width/2-2, msg.Height-10)
@@ -66,7 +66,7 @@ func (m *Model) Update(msg bubbletea.Msg) (bubbletea.Model, bubbletea.Cmd) {
 		}
 		return m, nil
 
-	case metricsUpdateMsg:
+	case MetricsUpdateMsg:
 		m.metrics = models.MetricSnapshot(msg)
 		m.metricsView.UpdateMetrics(m.metrics)
 		return m, nil
@@ -76,10 +76,10 @@ func (m *Model) Update(msg bubbletea.Msg) (bubbletea.Model, bubbletea.Cmd) {
 		m.nodesView.UpdateNodes(m.nodes)
 		return m, nil
 
-	case bubbletea.KeyMsg:
+	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
-			return m, bubbletea.Quit
+			return m, tea.Quit
 		case "p":
 			m.paused = !m.paused
 			if !m.paused {
@@ -87,7 +87,8 @@ func (m *Model) Update(msg bubbletea.Msg) (bubbletea.Model, bubbletea.Cmd) {
 			}
 			return m, nil
 		case "r":
-			// Reset metrics (TODO: implement)
+			m.metrics = models.MetricSnapshot{}
+			m.metricsView.UpdateMetrics(m.metrics)
 			return m, nil
 		}
 	}
@@ -134,8 +135,8 @@ func (m *Model) renderFooter() string {
 }
 
 // tick sends a tick message
-func (m *Model) tick() bubbletea.Cmd {
-	return bubbletea.Tick(1*time.Second, func(t time.Time) bubbletea.Msg {
+func (m *Model) tick() tea.Cmd {
+	return tea.Tick(1*time.Second, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
 }

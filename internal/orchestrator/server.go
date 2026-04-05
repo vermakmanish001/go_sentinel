@@ -5,17 +5,22 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/status"
 
 	"github.com/vermakmanish001/go_sentinel/internal/runtime"
-	pborchestrator "github.com/vermakmanish001/go_sentinel/proto/orchestrator"
 	pbmetrics "github.com/vermakmanish001/go_sentinel/proto/metrics"
+	pborchestrator "github.com/vermakmanish001/go_sentinel/proto/orchestrator"
+	pbworker "github.com/vermakmanish001/go_sentinel/proto/worker"
 	"github.com/vermakmanish001/go_sentinel/pkg/models"
 )
 
@@ -69,6 +74,9 @@ func (s *Server) DistributeTestPlan(ctx context.Context, req *pborchestrator.Dis
 		return nil, status.Errorf(codes.Internal, "failed to distribute plan: %v", err)
 	}
 
+	// Actually send the plan to each worker
+	go s.dispatchToWorkers(req.Plan, distribution)
+
 	// Convert distribution to proto format
 	workerVUDistribution := make(map[string]int32)
 	for workerID, vus := range distribution {
@@ -76,10 +84,66 @@ func (s *Server) DistributeTestPlan(ctx context.Context, req *pborchestrator.Dis
 	}
 
 	return &pborchestrator.DistributeResponse{
-		TestId:                req.Plan.Id,
-		WorkersAssigned:       int32(len(distribution)),
+		TestId:               req.Plan.Id,
+		WorkersAssigned:      int32(len(distribution)),
 		WorkerVuDistribution: workerVUDistribution,
 	}, nil
+}
+
+// dispatchToWorkers sends the test plan to each assigned worker via RunTest RPC
+func (s *Server) dispatchToWorkers(protoPlan *pborchestrator.TestPlan, distribution map[string]int32) {
+	for workerID, assignedVUs := range distribution {
+		node, ok := s.nodeManager.GetNode(workerID)
+		if !ok {
+			s.logger.Warn("worker not found for dispatch", zap.String("worker_id", workerID))
+			continue
+		}
+
+		addr := dialableAddress(node.Address)
+		wid := workerID
+		vus := assignedVUs
+
+		go func() {
+			conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+			if err != nil {
+				s.logger.Error("failed to connect to worker", zap.String("worker_id", wid), zap.Error(err))
+				return
+			}
+			defer conn.Close()
+
+			client := pbworker.NewWorkerServiceClient(conn)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			resp, err := client.RunTest(ctx, &pbworker.RunRequest{
+				TestId:      protoPlan.Id,
+				Plan:        protoPlan,
+				AssignedVus: vus,
+				WorkerId:    wid,
+			})
+			if err != nil {
+				s.logger.Error("failed to dispatch to worker",
+					zap.String("worker_id", wid), zap.Error(err))
+				return
+			}
+			s.logger.Info("worker started test",
+				zap.String("worker_id", wid),
+				zap.Bool("success", resp.Success),
+				zap.String("message", resp.Message),
+			)
+		}()
+	}
+}
+
+// dialableAddress converts a listen address (0.0.0.0:port) to a dialable one
+func dialableAddress(addr string) string {
+	if strings.HasPrefix(addr, "0.0.0.0:") {
+		return "localhost:" + strings.TrimPrefix(addr, "0.0.0.0:")
+	}
+	if strings.HasPrefix(addr, ":") {
+		return "localhost" + addr
+	}
+	return addr
 }
 
 // StreamMetrics streams aggregated metrics
@@ -210,12 +274,52 @@ func (s *Server) GetTestStatus(ctx context.Context, req *pborchestrator.TestStat
 		TimestampMs:   snapshot.Timestamp.UnixMilli(),
 	}
 
+	var totalVUs int32
+	for _, vus := range test.Workers {
+		totalVUs += vus
+	}
+
 	return &pborchestrator.TestStatusResponse{
-		Status:        protoStatus,
-		ActiveWorkers: int32(len(test.Workers)),
-		TotalVus:      int32(0), // TODO: Calculate from test
+		Status:         protoStatus,
+		ActiveWorkers:  int32(len(test.Workers)),
+		TotalVus:       totalVUs,
 		CurrentMetrics: protoSnapshot,
 	}, nil
+}
+
+// ReportMetrics receives a metric batch from a worker
+func (s *Server) ReportMetrics(ctx context.Context, batch *pbmetrics.MetricBatch) (*pborchestrator.ReportMetricsResponse, error) {
+	if batch == nil {
+		return &pborchestrator.ReportMetricsResponse{Accepted: false}, nil
+	}
+	if batch.RpsSnapshot == nil {
+		batch.RpsSnapshot = &pbmetrics.RPSSnapshot{}
+	}
+	if batch.LatencyHistogram == nil {
+		batch.LatencyHistogram = &pbmetrics.LatencyHistogram{}
+	}
+	if batch.ErrorRate == nil {
+		batch.ErrorRate = &pbmetrics.ErrorRate{}
+	}
+	s.metricsAggregator.UpdateWorkerMetrics(batch.WorkerId, batch)
+	s.nodeManager.UpdateLastSeen(batch.WorkerId)
+	return &pborchestrator.ReportMetricsResponse{Accepted: true}, nil
+}
+
+// ListWorkers returns all registered worker nodes
+func (s *Server) ListWorkers(ctx context.Context, req *pborchestrator.ListWorkersRequest) (*pborchestrator.ListWorkersResponse, error) {
+	nodes := s.nodeManager.GetNodes()
+	workers := make([]*pborchestrator.WorkerInfo, len(nodes))
+	for i, node := range nodes {
+		workers[i] = &pborchestrator.WorkerInfo{
+			WorkerId:   node.ID,
+			Address:    node.Address,
+			MaxVus:     node.MaxVUs,
+			Status:     string(node.Status),
+			LastSeenMs: node.LastSeen.UnixMilli(),
+		}
+	}
+	return &pborchestrator.ListWorkersResponse{Workers: workers}, nil
 }
 
 // StopTest stops a running test
@@ -317,6 +421,10 @@ func (s *Server) Start(address string) error {
 
 	grpcServer := grpc.NewServer()
 	pborchestrator.RegisterOrchestratorServiceServer(grpcServer, s)
+
+	healthServer := health.NewServer()
+	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
+	healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 
 	s.logger.Info("orchestrator server starting", zap.String("address", address))
 

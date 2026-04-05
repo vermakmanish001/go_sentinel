@@ -173,6 +173,15 @@ func (nm *NodeManager) checkNodeHealth(timeout time.Duration) {
 	}
 }
 
+// UpdateLastSeen updates the last-seen timestamp of a node
+func (nm *NodeManager) UpdateLastSeen(nodeID string) {
+	nm.mu.Lock()
+	defer nm.mu.Unlock()
+	if node, ok := nm.nodes[nodeID]; ok {
+		node.LastSeen = time.Now()
+	}
+}
+
 // Shutdown shuts down the node manager
 func (nm *NodeManager) Shutdown() error {
 	nm.cancel()

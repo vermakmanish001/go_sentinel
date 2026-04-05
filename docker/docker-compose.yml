@@ -46,7 +46,7 @@ services:
     build:
       context: ..
       dockerfile: docker/worker.Dockerfile
-    container_name: gosentinel-worker
+    # Allow multiple worker containers without name conflicts
     environment:
       - GOSENTINEL_WORKER_ADDRESS=0.0.0.0
       - GOSENTINEL_WORKER_PORT=50052

@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v7.34.0
-// source: proto/worker.proto
+// source: proto/worker/worker.proto
 
 package worker
 
@@ -58,11 +58,11 @@ func (x WorkerStatus_Status) String() string {
 }
 
 func (WorkerStatus_Status) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_worker_proto_enumTypes[0].Descriptor()
+	return file_proto_worker_worker_proto_enumTypes[0].Descriptor()
 }
 
 func (WorkerStatus_Status) Type() protoreflect.EnumType {
-	return &file_proto_worker_proto_enumTypes[0]
+	return &file_proto_worker_worker_proto_enumTypes[0]
 }
 
 func (x WorkerStatus_Status) Number() protoreflect.EnumNumber {
@@ -71,7 +71,7 @@ func (x WorkerStatus_Status) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use WorkerStatus_Status.Descriptor instead.
 func (WorkerStatus_Status) EnumDescriptor() ([]byte, []int) {
-	return file_proto_worker_proto_rawDescGZIP(), []int{2, 0}
+	return file_proto_worker_worker_proto_rawDescGZIP(), []int{2, 0}
 }
 
 // Run test request
@@ -87,7 +87,7 @@ type RunRequest struct {
 
 func (x *RunRequest) Reset() {
 	*x = RunRequest{}
-	mi := &file_proto_worker_proto_msgTypes[0]
+	mi := &file_proto_worker_worker_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -99,7 +99,7 @@ func (x *RunRequest) String() string {
 func (*RunRequest) ProtoMessage() {}
 
 func (x *RunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_worker_proto_msgTypes[0]
+	mi := &file_proto_worker_worker_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -112,7 +112,7 @@ func (x *RunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunRequest.ProtoReflect.Descriptor instead.
 func (*RunRequest) Descriptor() ([]byte, []int) {
-	return file_proto_worker_proto_rawDescGZIP(), []int{0}
+	return file_proto_worker_worker_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *RunRequest) GetTestId() string {
@@ -154,7 +154,7 @@ type RunResponse struct {
 
 func (x *RunResponse) Reset() {
 	*x = RunResponse{}
-	mi := &file_proto_worker_proto_msgTypes[1]
+	mi := &file_proto_worker_worker_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -166,7 +166,7 @@ func (x *RunResponse) String() string {
 func (*RunResponse) ProtoMessage() {}
 
 func (x *RunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_worker_proto_msgTypes[1]
+	mi := &file_proto_worker_worker_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -179,7 +179,7 @@ func (x *RunResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunResponse.ProtoReflect.Descriptor instead.
 func (*RunResponse) Descriptor() ([]byte, []int) {
-	return file_proto_worker_proto_rawDescGZIP(), []int{1}
+	return file_proto_worker_worker_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *RunResponse) GetSuccess() bool {
@@ -210,7 +210,7 @@ type WorkerStatus struct {
 
 func (x *WorkerStatus) Reset() {
 	*x = WorkerStatus{}
-	mi := &file_proto_worker_proto_msgTypes[2]
+	mi := &file_proto_worker_worker_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -222,7 +222,7 @@ func (x *WorkerStatus) String() string {
 func (*WorkerStatus) ProtoMessage() {}
 
 func (x *WorkerStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_worker_proto_msgTypes[2]
+	mi := &file_proto_worker_worker_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -235,7 +235,7 @@ func (x *WorkerStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkerStatus.ProtoReflect.Descriptor instead.
 func (*WorkerStatus) Descriptor() ([]byte, []int) {
-	return file_proto_worker_proto_rawDescGZIP(), []int{2}
+	return file_proto_worker_worker_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *WorkerStatus) GetStatus() WorkerStatus_Status {
@@ -284,7 +284,7 @@ type HeartbeatRequest struct {
 
 func (x *HeartbeatRequest) Reset() {
 	*x = HeartbeatRequest{}
-	mi := &file_proto_worker_proto_msgTypes[3]
+	mi := &file_proto_worker_worker_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -296,7 +296,7 @@ func (x *HeartbeatRequest) String() string {
 func (*HeartbeatRequest) ProtoMessage() {}
 
 func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_worker_proto_msgTypes[3]
+	mi := &file_proto_worker_worker_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -309,7 +309,7 @@ func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatRequest.ProtoReflect.Descriptor instead.
 func (*HeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_proto_worker_proto_rawDescGZIP(), []int{3}
+	return file_proto_worker_worker_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *HeartbeatRequest) GetWorkerId() string {
@@ -337,7 +337,7 @@ type HeartbeatResponse struct {
 
 func (x *HeartbeatResponse) Reset() {
 	*x = HeartbeatResponse{}
-	mi := &file_proto_worker_proto_msgTypes[4]
+	mi := &file_proto_worker_worker_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -349,7 +349,7 @@ func (x *HeartbeatResponse) String() string {
 func (*HeartbeatResponse) ProtoMessage() {}
 
 func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_worker_proto_msgTypes[4]
+	mi := &file_proto_worker_worker_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -362,7 +362,7 @@ func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatResponse.ProtoReflect.Descriptor instead.
 func (*HeartbeatResponse) Descriptor() ([]byte, []int) {
-	return file_proto_worker_proto_rawDescGZIP(), []int{4}
+	return file_proto_worker_worker_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *HeartbeatResponse) GetAcknowledged() bool {
@@ -389,7 +389,7 @@ type StatusRequest struct {
 
 func (x *StatusRequest) Reset() {
 	*x = StatusRequest{}
-	mi := &file_proto_worker_proto_msgTypes[5]
+	mi := &file_proto_worker_worker_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -401,7 +401,7 @@ func (x *StatusRequest) String() string {
 func (*StatusRequest) ProtoMessage() {}
 
 func (x *StatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_worker_proto_msgTypes[5]
+	mi := &file_proto_worker_worker_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -414,7 +414,7 @@ func (x *StatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatusRequest.ProtoReflect.Descriptor instead.
 func (*StatusRequest) Descriptor() ([]byte, []int) {
-	return file_proto_worker_proto_rawDescGZIP(), []int{5}
+	return file_proto_worker_worker_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *StatusRequest) GetWorkerId() string {
@@ -434,7 +434,7 @@ type StatusResponse struct {
 
 func (x *StatusResponse) Reset() {
 	*x = StatusResponse{}
-	mi := &file_proto_worker_proto_msgTypes[6]
+	mi := &file_proto_worker_worker_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -446,7 +446,7 @@ func (x *StatusResponse) String() string {
 func (*StatusResponse) ProtoMessage() {}
 
 func (x *StatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_worker_proto_msgTypes[6]
+	mi := &file_proto_worker_worker_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -459,7 +459,7 @@ func (x *StatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatusResponse.ProtoReflect.Descriptor instead.
 func (*StatusResponse) Descriptor() ([]byte, []int) {
-	return file_proto_worker_proto_rawDescGZIP(), []int{6}
+	return file_proto_worker_worker_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *StatusResponse) GetStatus() *WorkerStatus {
@@ -479,7 +479,7 @@ type StopRequest struct {
 
 func (x *StopRequest) Reset() {
 	*x = StopRequest{}
-	mi := &file_proto_worker_proto_msgTypes[7]
+	mi := &file_proto_worker_worker_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -491,7 +491,7 @@ func (x *StopRequest) String() string {
 func (*StopRequest) ProtoMessage() {}
 
 func (x *StopRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_worker_proto_msgTypes[7]
+	mi := &file_proto_worker_worker_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -504,7 +504,7 @@ func (x *StopRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopRequest.ProtoReflect.Descriptor instead.
 func (*StopRequest) Descriptor() ([]byte, []int) {
-	return file_proto_worker_proto_rawDescGZIP(), []int{7}
+	return file_proto_worker_worker_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *StopRequest) GetTestId() string {
@@ -525,7 +525,7 @@ type StopResponse struct {
 
 func (x *StopResponse) Reset() {
 	*x = StopResponse{}
-	mi := &file_proto_worker_proto_msgTypes[8]
+	mi := &file_proto_worker_worker_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -537,7 +537,7 @@ func (x *StopResponse) String() string {
 func (*StopResponse) ProtoMessage() {}
 
 func (x *StopResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_worker_proto_msgTypes[8]
+	mi := &file_proto_worker_worker_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -550,7 +550,7 @@ func (x *StopResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopResponse.ProtoReflect.Descriptor instead.
 func (*StopResponse) Descriptor() ([]byte, []int) {
-	return file_proto_worker_proto_rawDescGZIP(), []int{8}
+	return file_proto_worker_worker_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *StopResponse) GetSuccess() bool {
@@ -567,11 +567,11 @@ func (x *StopResponse) GetMessage() string {
 	return ""
 }
 
-var File_proto_worker_proto protoreflect.FileDescriptor
+var File_proto_worker_worker_proto protoreflect.FileDescriptor
 
-const file_proto_worker_proto_rawDesc = "" +
+const file_proto_worker_worker_proto_rawDesc = "" +
 	"\n" +
-	"\x12proto/worker.proto\x12\x06worker\x1a\x18proto/orchestrator.proto\"\x91\x01\n" +
+	"\x19proto/worker/worker.proto\x12\x06worker\x1a%proto/orchestrator/orchestrator.proto\"\x91\x01\n" +
 	"\n" +
 	"RunRequest\x12\x17\n" +
 	"\atest_id\x18\x01 \x01(\tR\x06testId\x12*\n" +
@@ -615,23 +615,23 @@ const file_proto_worker_proto_rawDesc = "" +
 	"\aRunTest\x12\x12.worker.RunRequest\x1a\x13.worker.RunResponse\x12@\n" +
 	"\tHeartbeat\x12\x18.worker.HeartbeatRequest\x1a\x19.worker.HeartbeatResponse\x12:\n" +
 	"\tGetStatus\x12\x15.worker.StatusRequest\x1a\x16.worker.StatusResponse\x125\n" +
-	"\bStopTest\x12\x13.worker.StopRequest\x1a\x14.worker.StopResponseB/Z-github.com/gosentinel/gosentinel/proto/workerb\x06proto3"
+	"\bStopTest\x12\x13.worker.StopRequest\x1a\x14.worker.StopResponseB5Z3github.com/vermakmanish001/go_sentinel/proto/workerb\x06proto3"
 
 var (
-	file_proto_worker_proto_rawDescOnce sync.Once
-	file_proto_worker_proto_rawDescData []byte
+	file_proto_worker_worker_proto_rawDescOnce sync.Once
+	file_proto_worker_worker_proto_rawDescData []byte
 )
 
-func file_proto_worker_proto_rawDescGZIP() []byte {
-	file_proto_worker_proto_rawDescOnce.Do(func() {
-		file_proto_worker_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_worker_proto_rawDesc), len(file_proto_worker_proto_rawDesc)))
+func file_proto_worker_worker_proto_rawDescGZIP() []byte {
+	file_proto_worker_worker_proto_rawDescOnce.Do(func() {
+		file_proto_worker_worker_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_worker_worker_proto_rawDesc), len(file_proto_worker_worker_proto_rawDesc)))
 	})
-	return file_proto_worker_proto_rawDescData
+	return file_proto_worker_worker_proto_rawDescData
 }
 
-var file_proto_worker_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_worker_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
-var file_proto_worker_proto_goTypes = []any{
+var file_proto_worker_worker_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_proto_worker_worker_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_proto_worker_worker_proto_goTypes = []any{
 	(WorkerStatus_Status)(0),      // 0: worker.WorkerStatus.Status
 	(*RunRequest)(nil),            // 1: worker.RunRequest
 	(*RunResponse)(nil),           // 2: worker.RunResponse
@@ -645,7 +645,7 @@ var file_proto_worker_proto_goTypes = []any{
 	nil,                           // 10: worker.WorkerStatus.MetadataEntry
 	(*orchestrator.TestPlan)(nil), // 11: orchestrator.TestPlan
 }
-var file_proto_worker_proto_depIdxs = []int32{
+var file_proto_worker_worker_proto_depIdxs = []int32{
 	11, // 0: worker.RunRequest.plan:type_name -> orchestrator.TestPlan
 	0,  // 1: worker.WorkerStatus.status:type_name -> worker.WorkerStatus.Status
 	10, // 2: worker.WorkerStatus.metadata:type_name -> worker.WorkerStatus.MetadataEntry
@@ -666,27 +666,27 @@ var file_proto_worker_proto_depIdxs = []int32{
 	0,  // [0:5] is the sub-list for field type_name
 }
 
-func init() { file_proto_worker_proto_init() }
-func file_proto_worker_proto_init() {
-	if File_proto_worker_proto != nil {
+func init() { file_proto_worker_worker_proto_init() }
+func file_proto_worker_worker_proto_init() {
+	if File_proto_worker_worker_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_worker_proto_rawDesc), len(file_proto_worker_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_worker_worker_proto_rawDesc), len(file_proto_worker_worker_proto_rawDesc)),
 			NumEnums:      1,
 			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_worker_proto_goTypes,
-		DependencyIndexes: file_proto_worker_proto_depIdxs,
-		EnumInfos:         file_proto_worker_proto_enumTypes,
-		MessageInfos:      file_proto_worker_proto_msgTypes,
+		GoTypes:           file_proto_worker_worker_proto_goTypes,
+		DependencyIndexes: file_proto_worker_worker_proto_depIdxs,
+		EnumInfos:         file_proto_worker_worker_proto_enumTypes,
+		MessageInfos:      file_proto_worker_worker_proto_msgTypes,
 	}.Build()
-	File_proto_worker_proto = out.File
-	file_proto_worker_proto_goTypes = nil
-	file_proto_worker_proto_depIdxs = nil
+	File_proto_worker_worker_proto = out.File
+	file_proto_worker_worker_proto_goTypes = nil
+	file_proto_worker_worker_proto_depIdxs = nil
 }

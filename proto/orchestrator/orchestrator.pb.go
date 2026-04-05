@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v7.34.0
-// source: proto/orchestrator.proto
+// source: proto/orchestrator/orchestrator.proto
 
 package orchestrator
 
@@ -64,11 +64,11 @@ func (x TestStatusResponse_Status) String() string {
 }
 
 func (TestStatusResponse_Status) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_orchestrator_proto_enumTypes[0].Descriptor()
+	return file_proto_orchestrator_orchestrator_proto_enumTypes[0].Descriptor()
 }
 
 func (TestStatusResponse_Status) Type() protoreflect.EnumType {
-	return &file_proto_orchestrator_proto_enumTypes[0]
+	return &file_proto_orchestrator_orchestrator_proto_enumTypes[0]
 }
 
 func (x TestStatusResponse_Status) Number() protoreflect.EnumNumber {
@@ -77,7 +77,7 @@ func (x TestStatusResponse_Status) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TestStatusResponse_Status.Descriptor instead.
 func (TestStatusResponse_Status) EnumDescriptor() ([]byte, []int) {
-	return file_proto_orchestrator_proto_rawDescGZIP(), []int{15, 0}
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{15, 0}
 }
 
 // Test plan definition
@@ -95,7 +95,7 @@ type TestPlan struct {
 
 func (x *TestPlan) Reset() {
 	*x = TestPlan{}
-	mi := &file_proto_orchestrator_proto_msgTypes[0]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -107,7 +107,7 @@ func (x *TestPlan) String() string {
 func (*TestPlan) ProtoMessage() {}
 
 func (x *TestPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_orchestrator_proto_msgTypes[0]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -120,7 +120,7 @@ func (x *TestPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TestPlan.ProtoReflect.Descriptor instead.
 func (*TestPlan) Descriptor() ([]byte, []int) {
-	return file_proto_orchestrator_proto_rawDescGZIP(), []int{0}
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *TestPlan) GetId() string {
@@ -177,7 +177,7 @@ type Stage struct {
 
 func (x *Stage) Reset() {
 	*x = Stage{}
-	mi := &file_proto_orchestrator_proto_msgTypes[1]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -189,7 +189,7 @@ func (x *Stage) String() string {
 func (*Stage) ProtoMessage() {}
 
 func (x *Stage) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_orchestrator_proto_msgTypes[1]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -202,7 +202,7 @@ func (x *Stage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Stage.ProtoReflect.Descriptor instead.
 func (*Stage) Descriptor() ([]byte, []int) {
-	return file_proto_orchestrator_proto_rawDescGZIP(), []int{1}
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Stage) GetDuration() string {
@@ -239,7 +239,7 @@ type HTTPConfig struct {
 
 func (x *HTTPConfig) Reset() {
 	*x = HTTPConfig{}
-	mi := &file_proto_orchestrator_proto_msgTypes[2]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -251,7 +251,7 @@ func (x *HTTPConfig) String() string {
 func (*HTTPConfig) ProtoMessage() {}
 
 func (x *HTTPConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_orchestrator_proto_msgTypes[2]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -264,7 +264,7 @@ func (x *HTTPConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HTTPConfig.ProtoReflect.Descriptor instead.
 func (*HTTPConfig) Descriptor() ([]byte, []int) {
-	return file_proto_orchestrator_proto_rawDescGZIP(), []int{2}
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *HTTPConfig) GetBaseUrl() string {
@@ -310,7 +310,7 @@ type Request struct {
 
 func (x *Request) Reset() {
 	*x = Request{}
-	mi := &file_proto_orchestrator_proto_msgTypes[3]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -322,7 +322,7 @@ func (x *Request) String() string {
 func (*Request) ProtoMessage() {}
 
 func (x *Request) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_orchestrator_proto_msgTypes[3]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -335,7 +335,7 @@ func (x *Request) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Request.ProtoReflect.Descriptor instead.
 func (*Request) Descriptor() ([]byte, []int) {
-	return file_proto_orchestrator_proto_rawDescGZIP(), []int{3}
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Request) GetMethod() string {
@@ -395,7 +395,7 @@ type Assertion struct {
 
 func (x *Assertion) Reset() {
 	*x = Assertion{}
-	mi := &file_proto_orchestrator_proto_msgTypes[4]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -407,7 +407,7 @@ func (x *Assertion) String() string {
 func (*Assertion) ProtoMessage() {}
 
 func (x *Assertion) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_orchestrator_proto_msgTypes[4]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -420,7 +420,7 @@ func (x *Assertion) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Assertion.ProtoReflect.Descriptor instead.
 func (*Assertion) Descriptor() ([]byte, []int) {
-	return file_proto_orchestrator_proto_rawDescGZIP(), []int{4}
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Assertion) GetAssertion() isAssertion_Assertion {
@@ -488,7 +488,7 @@ type StatusCodeAssertion struct {
 
 func (x *StatusCodeAssertion) Reset() {
 	*x = StatusCodeAssertion{}
-	mi := &file_proto_orchestrator_proto_msgTypes[5]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -500,7 +500,7 @@ func (x *StatusCodeAssertion) String() string {
 func (*StatusCodeAssertion) ProtoMessage() {}
 
 func (x *StatusCodeAssertion) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_orchestrator_proto_msgTypes[5]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -513,7 +513,7 @@ func (x *StatusCodeAssertion) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatusCodeAssertion.ProtoReflect.Descriptor instead.
 func (*StatusCodeAssertion) Descriptor() ([]byte, []int) {
-	return file_proto_orchestrator_proto_rawDescGZIP(), []int{5}
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *StatusCodeAssertion) GetExpected() int32 {
@@ -533,7 +533,7 @@ type ResponseTimeAssertion struct {
 
 func (x *ResponseTimeAssertion) Reset() {
 	*x = ResponseTimeAssertion{}
-	mi := &file_proto_orchestrator_proto_msgTypes[6]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -545,7 +545,7 @@ func (x *ResponseTimeAssertion) String() string {
 func (*ResponseTimeAssertion) ProtoMessage() {}
 
 func (x *ResponseTimeAssertion) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_orchestrator_proto_msgTypes[6]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -558,7 +558,7 @@ func (x *ResponseTimeAssertion) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResponseTimeAssertion.ProtoReflect.Descriptor instead.
 func (*ResponseTimeAssertion) Descriptor() ([]byte, []int) {
-	return file_proto_orchestrator_proto_rawDescGZIP(), []int{6}
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ResponseTimeAssertion) GetPercentile() string {
@@ -584,7 +584,7 @@ type BodyContainsAssertion struct {
 
 func (x *BodyContainsAssertion) Reset() {
 	*x = BodyContainsAssertion{}
-	mi := &file_proto_orchestrator_proto_msgTypes[7]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -596,7 +596,7 @@ func (x *BodyContainsAssertion) String() string {
 func (*BodyContainsAssertion) ProtoMessage() {}
 
 func (x *BodyContainsAssertion) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_orchestrator_proto_msgTypes[7]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -609,7 +609,7 @@ func (x *BodyContainsAssertion) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BodyContainsAssertion.ProtoReflect.Descriptor instead.
 func (*BodyContainsAssertion) Descriptor() ([]byte, []int) {
-	return file_proto_orchestrator_proto_rawDescGZIP(), []int{7}
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *BodyContainsAssertion) GetSubstring() string {
@@ -629,7 +629,7 @@ type DistributeRequest struct {
 
 func (x *DistributeRequest) Reset() {
 	*x = DistributeRequest{}
-	mi := &file_proto_orchestrator_proto_msgTypes[8]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -641,7 +641,7 @@ func (x *DistributeRequest) String() string {
 func (*DistributeRequest) ProtoMessage() {}
 
 func (x *DistributeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_orchestrator_proto_msgTypes[8]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -654,7 +654,7 @@ func (x *DistributeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DistributeRequest.ProtoReflect.Descriptor instead.
 func (*DistributeRequest) Descriptor() ([]byte, []int) {
-	return file_proto_orchestrator_proto_rawDescGZIP(), []int{8}
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *DistributeRequest) GetPlan() *TestPlan {
@@ -676,7 +676,7 @@ type DistributeResponse struct {
 
 func (x *DistributeResponse) Reset() {
 	*x = DistributeResponse{}
-	mi := &file_proto_orchestrator_proto_msgTypes[9]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -688,7 +688,7 @@ func (x *DistributeResponse) String() string {
 func (*DistributeResponse) ProtoMessage() {}
 
 func (x *DistributeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_orchestrator_proto_msgTypes[9]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -701,7 +701,7 @@ func (x *DistributeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DistributeResponse.ProtoReflect.Descriptor instead.
 func (*DistributeResponse) Descriptor() ([]byte, []int) {
-	return file_proto_orchestrator_proto_rawDescGZIP(), []int{9}
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *DistributeResponse) GetTestId() string {
@@ -735,7 +735,7 @@ type StreamMetricsRequest struct {
 
 func (x *StreamMetricsRequest) Reset() {
 	*x = StreamMetricsRequest{}
-	mi := &file_proto_orchestrator_proto_msgTypes[10]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -747,7 +747,7 @@ func (x *StreamMetricsRequest) String() string {
 func (*StreamMetricsRequest) ProtoMessage() {}
 
 func (x *StreamMetricsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_orchestrator_proto_msgTypes[10]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -760,7 +760,7 @@ func (x *StreamMetricsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamMetricsRequest.ProtoReflect.Descriptor instead.
 func (*StreamMetricsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_orchestrator_proto_rawDescGZIP(), []int{10}
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *StreamMetricsRequest) GetTestId() string {
@@ -781,7 +781,7 @@ type StreamMetricsResponse struct {
 
 func (x *StreamMetricsResponse) Reset() {
 	*x = StreamMetricsResponse{}
-	mi := &file_proto_orchestrator_proto_msgTypes[11]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -793,7 +793,7 @@ func (x *StreamMetricsResponse) String() string {
 func (*StreamMetricsResponse) ProtoMessage() {}
 
 func (x *StreamMetricsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_orchestrator_proto_msgTypes[11]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -806,7 +806,7 @@ func (x *StreamMetricsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamMetricsResponse.ProtoReflect.Descriptor instead.
 func (*StreamMetricsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_orchestrator_proto_rawDescGZIP(), []int{11}
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *StreamMetricsResponse) GetSnapshot() *metrics.MetricSnapshot {
@@ -836,7 +836,7 @@ type RegisterWorkerRequest struct {
 
 func (x *RegisterWorkerRequest) Reset() {
 	*x = RegisterWorkerRequest{}
-	mi := &file_proto_orchestrator_proto_msgTypes[12]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -848,7 +848,7 @@ func (x *RegisterWorkerRequest) String() string {
 func (*RegisterWorkerRequest) ProtoMessage() {}
 
 func (x *RegisterWorkerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_orchestrator_proto_msgTypes[12]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -861,7 +861,7 @@ func (x *RegisterWorkerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterWorkerRequest.ProtoReflect.Descriptor instead.
 func (*RegisterWorkerRequest) Descriptor() ([]byte, []int) {
-	return file_proto_orchestrator_proto_rawDescGZIP(), []int{12}
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *RegisterWorkerRequest) GetWorkerId() string {
@@ -903,7 +903,7 @@ type RegisterWorkerResponse struct {
 
 func (x *RegisterWorkerResponse) Reset() {
 	*x = RegisterWorkerResponse{}
-	mi := &file_proto_orchestrator_proto_msgTypes[13]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -915,7 +915,7 @@ func (x *RegisterWorkerResponse) String() string {
 func (*RegisterWorkerResponse) ProtoMessage() {}
 
 func (x *RegisterWorkerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_orchestrator_proto_msgTypes[13]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -928,7 +928,7 @@ func (x *RegisterWorkerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterWorkerResponse.ProtoReflect.Descriptor instead.
 func (*RegisterWorkerResponse) Descriptor() ([]byte, []int) {
-	return file_proto_orchestrator_proto_rawDescGZIP(), []int{13}
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *RegisterWorkerResponse) GetSuccess() bool {
@@ -955,7 +955,7 @@ type TestStatusRequest struct {
 
 func (x *TestStatusRequest) Reset() {
 	*x = TestStatusRequest{}
-	mi := &file_proto_orchestrator_proto_msgTypes[14]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -967,7 +967,7 @@ func (x *TestStatusRequest) String() string {
 func (*TestStatusRequest) ProtoMessage() {}
 
 func (x *TestStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_orchestrator_proto_msgTypes[14]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -980,7 +980,7 @@ func (x *TestStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TestStatusRequest.ProtoReflect.Descriptor instead.
 func (*TestStatusRequest) Descriptor() ([]byte, []int) {
-	return file_proto_orchestrator_proto_rawDescGZIP(), []int{14}
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *TestStatusRequest) GetTestId() string {
@@ -1003,7 +1003,7 @@ type TestStatusResponse struct {
 
 func (x *TestStatusResponse) Reset() {
 	*x = TestStatusResponse{}
-	mi := &file_proto_orchestrator_proto_msgTypes[15]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1015,7 +1015,7 @@ func (x *TestStatusResponse) String() string {
 func (*TestStatusResponse) ProtoMessage() {}
 
 func (x *TestStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_orchestrator_proto_msgTypes[15]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1028,7 +1028,7 @@ func (x *TestStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TestStatusResponse.ProtoReflect.Descriptor instead.
 func (*TestStatusResponse) Descriptor() ([]byte, []int) {
-	return file_proto_orchestrator_proto_rawDescGZIP(), []int{15}
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *TestStatusResponse) GetStatus() TestStatusResponse_Status {
@@ -1069,7 +1069,7 @@ type StopTestRequest struct {
 
 func (x *StopTestRequest) Reset() {
 	*x = StopTestRequest{}
-	mi := &file_proto_orchestrator_proto_msgTypes[16]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1081,7 +1081,7 @@ func (x *StopTestRequest) String() string {
 func (*StopTestRequest) ProtoMessage() {}
 
 func (x *StopTestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_orchestrator_proto_msgTypes[16]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1094,7 +1094,7 @@ func (x *StopTestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopTestRequest.ProtoReflect.Descriptor instead.
 func (*StopTestRequest) Descriptor() ([]byte, []int) {
-	return file_proto_orchestrator_proto_rawDescGZIP(), []int{16}
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *StopTestRequest) GetTestId() string {
@@ -1115,7 +1115,7 @@ type StopTestResponse struct {
 
 func (x *StopTestResponse) Reset() {
 	*x = StopTestResponse{}
-	mi := &file_proto_orchestrator_proto_msgTypes[17]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1127,7 +1127,7 @@ func (x *StopTestResponse) String() string {
 func (*StopTestResponse) ProtoMessage() {}
 
 func (x *StopTestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_orchestrator_proto_msgTypes[17]
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1140,7 +1140,7 @@ func (x *StopTestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopTestResponse.ProtoReflect.Descriptor instead.
 func (*StopTestResponse) Descriptor() ([]byte, []int) {
-	return file_proto_orchestrator_proto_rawDescGZIP(), []int{17}
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *StopTestResponse) GetSuccess() bool {
@@ -1157,11 +1157,215 @@ func (x *StopTestResponse) GetMessage() string {
 	return ""
 }
 
-var File_proto_orchestrator_proto protoreflect.FileDescriptor
+// ReportMetrics response
+type ReportMetricsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Accepted      bool                   `protobuf:"varint,1,opt,name=accepted,proto3" json:"accepted,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
 
-const file_proto_orchestrator_proto_rawDesc = "" +
+func (x *ReportMetricsResponse) Reset() {
+	*x = ReportMetricsResponse{}
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportMetricsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportMetricsResponse) ProtoMessage() {}
+
+func (x *ReportMetricsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportMetricsResponse.ProtoReflect.Descriptor instead.
+func (*ReportMetricsResponse) Descriptor() ([]byte, []int) {
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ReportMetricsResponse) GetAccepted() bool {
+	if x != nil {
+		return x.Accepted
+	}
+	return false
+}
+
+// ListWorkers request
+type ListWorkersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListWorkersRequest) Reset() {
+	*x = ListWorkersRequest{}
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListWorkersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListWorkersRequest) ProtoMessage() {}
+
+func (x *ListWorkersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListWorkersRequest.ProtoReflect.Descriptor instead.
+func (*ListWorkersRequest) Descriptor() ([]byte, []int) {
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{19}
+}
+
+// ListWorkers response
+type ListWorkersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Workers       []*WorkerInfo          `protobuf:"bytes,1,rep,name=workers,proto3" json:"workers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListWorkersResponse) Reset() {
+	*x = ListWorkersResponse{}
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListWorkersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListWorkersResponse) ProtoMessage() {}
+
+func (x *ListWorkersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListWorkersResponse.ProtoReflect.Descriptor instead.
+func (*ListWorkersResponse) Descriptor() ([]byte, []int) {
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *ListWorkersResponse) GetWorkers() []*WorkerInfo {
+	if x != nil {
+		return x.Workers
+	}
+	return nil
+}
+
+// Worker information
+type WorkerInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorkerId      string                 `protobuf:"bytes,1,opt,name=worker_id,json=workerId,proto3" json:"worker_id,omitempty"`
+	Address       string                 `protobuf:"bytes,2,opt,name=address,proto3" json:"address,omitempty"`
+	MaxVus        int32                  `protobuf:"varint,3,opt,name=max_vus,json=maxVus,proto3" json:"max_vus,omitempty"`
+	Status        string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
+	LastSeenMs    int64                  `protobuf:"varint,5,opt,name=last_seen_ms,json=lastSeenMs,proto3" json:"last_seen_ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WorkerInfo) Reset() {
+	*x = WorkerInfo{}
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkerInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkerInfo) ProtoMessage() {}
+
+func (x *WorkerInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_orchestrator_orchestrator_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkerInfo.ProtoReflect.Descriptor instead.
+func (*WorkerInfo) Descriptor() ([]byte, []int) {
+	return file_proto_orchestrator_orchestrator_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *WorkerInfo) GetWorkerId() string {
+	if x != nil {
+		return x.WorkerId
+	}
+	return ""
+}
+
+func (x *WorkerInfo) GetAddress() string {
+	if x != nil {
+		return x.Address
+	}
+	return ""
+}
+
+func (x *WorkerInfo) GetMaxVus() int32 {
+	if x != nil {
+		return x.MaxVus
+	}
+	return 0
+}
+
+func (x *WorkerInfo) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *WorkerInfo) GetLastSeenMs() int64 {
+	if x != nil {
+		return x.LastSeenMs
+	}
+	return 0
+}
+
+var File_proto_orchestrator_orchestrator_proto protoreflect.FileDescriptor
+
+const file_proto_orchestrator_orchestrator_proto_rawDesc = "" +
 	"\n" +
-	"\x18proto/orchestrator.proto\x12\forchestrator\x1a\x13proto/metrics.proto\"\xbc\x02\n" +
+	"%proto/orchestrator/orchestrator.proto\x12\forchestrator\x1a\x1bproto/metrics/metrics.proto\"\xbc\x02\n" +
 	"\bTestPlan\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12+\n" +
@@ -1258,29 +1462,44 @@ const file_proto_orchestrator_proto_rawDesc = "" +
 	"\atest_id\x18\x01 \x01(\tR\x06testId\"F\n" +
 	"\x10StopTestResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2\xc6\x03\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"3\n" +
+	"\x15ReportMetricsResponse\x12\x1a\n" +
+	"\baccepted\x18\x01 \x01(\bR\baccepted\"\x14\n" +
+	"\x12ListWorkersRequest\"I\n" +
+	"\x13ListWorkersResponse\x122\n" +
+	"\aworkers\x18\x01 \x03(\v2\x18.orchestrator.WorkerInfoR\aworkers\"\x96\x01\n" +
+	"\n" +
+	"WorkerInfo\x12\x1b\n" +
+	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12\x18\n" +
+	"\aaddress\x18\x02 \x01(\tR\aaddress\x12\x17\n" +
+	"\amax_vus\x18\x03 \x01(\x05R\x06maxVus\x12\x16\n" +
+	"\x06status\x18\x04 \x01(\tR\x06status\x12 \n" +
+	"\flast_seen_ms\x18\x05 \x01(\x03R\n" +
+	"lastSeenMs2\xe6\x04\n" +
 	"\x13OrchestratorService\x12W\n" +
 	"\x12DistributeTestPlan\x12\x1f.orchestrator.DistributeRequest\x1a .orchestrator.DistributeResponse\x12Z\n" +
 	"\rStreamMetrics\x12\".orchestrator.StreamMetricsRequest\x1a#.orchestrator.StreamMetricsResponse0\x01\x12[\n" +
 	"\x0eRegisterWorker\x12#.orchestrator.RegisterWorkerRequest\x1a$.orchestrator.RegisterWorkerResponse\x12R\n" +
 	"\rGetTestStatus\x12\x1f.orchestrator.TestStatusRequest\x1a .orchestrator.TestStatusResponse\x12I\n" +
-	"\bStopTest\x12\x1d.orchestrator.StopTestRequest\x1a\x1e.orchestrator.StopTestResponseB5Z3github.com/gosentinel/gosentinel/proto/orchestratorb\x06proto3"
+	"\bStopTest\x12\x1d.orchestrator.StopTestRequest\x1a\x1e.orchestrator.StopTestResponse\x12J\n" +
+	"\rReportMetrics\x12\x14.metrics.MetricBatch\x1a#.orchestrator.ReportMetricsResponse\x12R\n" +
+	"\vListWorkers\x12 .orchestrator.ListWorkersRequest\x1a!.orchestrator.ListWorkersResponseB;Z9github.com/vermakmanish001/go_sentinel/proto/orchestratorb\x06proto3"
 
 var (
-	file_proto_orchestrator_proto_rawDescOnce sync.Once
-	file_proto_orchestrator_proto_rawDescData []byte
+	file_proto_orchestrator_orchestrator_proto_rawDescOnce sync.Once
+	file_proto_orchestrator_orchestrator_proto_rawDescData []byte
 )
 
-func file_proto_orchestrator_proto_rawDescGZIP() []byte {
-	file_proto_orchestrator_proto_rawDescOnce.Do(func() {
-		file_proto_orchestrator_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_orchestrator_proto_rawDesc), len(file_proto_orchestrator_proto_rawDesc)))
+func file_proto_orchestrator_orchestrator_proto_rawDescGZIP() []byte {
+	file_proto_orchestrator_orchestrator_proto_rawDescOnce.Do(func() {
+		file_proto_orchestrator_orchestrator_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_orchestrator_orchestrator_proto_rawDesc), len(file_proto_orchestrator_orchestrator_proto_rawDesc)))
 	})
-	return file_proto_orchestrator_proto_rawDescData
+	return file_proto_orchestrator_orchestrator_proto_rawDescData
 }
 
-var file_proto_orchestrator_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_orchestrator_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
-var file_proto_orchestrator_proto_goTypes = []any{
+var file_proto_orchestrator_orchestrator_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_proto_orchestrator_orchestrator_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
+var file_proto_orchestrator_orchestrator_proto_goTypes = []any{
 	(TestStatusResponse_Status)(0), // 0: orchestrator.TestStatusResponse.Status
 	(*TestPlan)(nil),               // 1: orchestrator.TestPlan
 	(*Stage)(nil),                  // 2: orchestrator.Stage
@@ -1300,53 +1519,63 @@ var file_proto_orchestrator_proto_goTypes = []any{
 	(*TestStatusResponse)(nil),     // 16: orchestrator.TestStatusResponse
 	(*StopTestRequest)(nil),        // 17: orchestrator.StopTestRequest
 	(*StopTestResponse)(nil),       // 18: orchestrator.StopTestResponse
-	nil,                            // 19: orchestrator.TestPlan.VariablesEntry
-	nil,                            // 20: orchestrator.HTTPConfig.HeadersEntry
-	nil,                            // 21: orchestrator.Request.HeadersEntry
-	nil,                            // 22: orchestrator.DistributeResponse.WorkerVuDistributionEntry
-	nil,                            // 23: orchestrator.RegisterWorkerRequest.MetadataEntry
-	(*metrics.MetricSnapshot)(nil), // 24: metrics.MetricSnapshot
+	(*ReportMetricsResponse)(nil),  // 19: orchestrator.ReportMetricsResponse
+	(*ListWorkersRequest)(nil),     // 20: orchestrator.ListWorkersRequest
+	(*ListWorkersResponse)(nil),    // 21: orchestrator.ListWorkersResponse
+	(*WorkerInfo)(nil),             // 22: orchestrator.WorkerInfo
+	nil,                            // 23: orchestrator.TestPlan.VariablesEntry
+	nil,                            // 24: orchestrator.HTTPConfig.HeadersEntry
+	nil,                            // 25: orchestrator.Request.HeadersEntry
+	nil,                            // 26: orchestrator.DistributeResponse.WorkerVuDistributionEntry
+	nil,                            // 27: orchestrator.RegisterWorkerRequest.MetadataEntry
+	(*metrics.MetricSnapshot)(nil), // 28: metrics.MetricSnapshot
+	(*metrics.MetricBatch)(nil),    // 29: metrics.MetricBatch
 }
-var file_proto_orchestrator_proto_depIdxs = []int32{
+var file_proto_orchestrator_orchestrator_proto_depIdxs = []int32{
 	2,  // 0: orchestrator.TestPlan.stages:type_name -> orchestrator.Stage
 	3,  // 1: orchestrator.TestPlan.http:type_name -> orchestrator.HTTPConfig
-	19, // 2: orchestrator.TestPlan.variables:type_name -> orchestrator.TestPlan.VariablesEntry
+	23, // 2: orchestrator.TestPlan.variables:type_name -> orchestrator.TestPlan.VariablesEntry
 	4,  // 3: orchestrator.HTTPConfig.requests:type_name -> orchestrator.Request
-	20, // 4: orchestrator.HTTPConfig.headers:type_name -> orchestrator.HTTPConfig.HeadersEntry
-	21, // 5: orchestrator.Request.headers:type_name -> orchestrator.Request.HeadersEntry
+	24, // 4: orchestrator.HTTPConfig.headers:type_name -> orchestrator.HTTPConfig.HeadersEntry
+	25, // 5: orchestrator.Request.headers:type_name -> orchestrator.Request.HeadersEntry
 	5,  // 6: orchestrator.Request.assertions:type_name -> orchestrator.Assertion
 	6,  // 7: orchestrator.Assertion.status_code:type_name -> orchestrator.StatusCodeAssertion
 	7,  // 8: orchestrator.Assertion.response_time:type_name -> orchestrator.ResponseTimeAssertion
 	8,  // 9: orchestrator.Assertion.body_contains:type_name -> orchestrator.BodyContainsAssertion
 	1,  // 10: orchestrator.DistributeRequest.plan:type_name -> orchestrator.TestPlan
-	22, // 11: orchestrator.DistributeResponse.worker_vu_distribution:type_name -> orchestrator.DistributeResponse.WorkerVuDistributionEntry
-	24, // 12: orchestrator.StreamMetricsResponse.snapshot:type_name -> metrics.MetricSnapshot
-	23, // 13: orchestrator.RegisterWorkerRequest.metadata:type_name -> orchestrator.RegisterWorkerRequest.MetadataEntry
+	26, // 11: orchestrator.DistributeResponse.worker_vu_distribution:type_name -> orchestrator.DistributeResponse.WorkerVuDistributionEntry
+	28, // 12: orchestrator.StreamMetricsResponse.snapshot:type_name -> metrics.MetricSnapshot
+	27, // 13: orchestrator.RegisterWorkerRequest.metadata:type_name -> orchestrator.RegisterWorkerRequest.MetadataEntry
 	0,  // 14: orchestrator.TestStatusResponse.status:type_name -> orchestrator.TestStatusResponse.Status
-	24, // 15: orchestrator.TestStatusResponse.current_metrics:type_name -> metrics.MetricSnapshot
-	9,  // 16: orchestrator.OrchestratorService.DistributeTestPlan:input_type -> orchestrator.DistributeRequest
-	11, // 17: orchestrator.OrchestratorService.StreamMetrics:input_type -> orchestrator.StreamMetricsRequest
-	13, // 18: orchestrator.OrchestratorService.RegisterWorker:input_type -> orchestrator.RegisterWorkerRequest
-	15, // 19: orchestrator.OrchestratorService.GetTestStatus:input_type -> orchestrator.TestStatusRequest
-	17, // 20: orchestrator.OrchestratorService.StopTest:input_type -> orchestrator.StopTestRequest
-	10, // 21: orchestrator.OrchestratorService.DistributeTestPlan:output_type -> orchestrator.DistributeResponse
-	12, // 22: orchestrator.OrchestratorService.StreamMetrics:output_type -> orchestrator.StreamMetricsResponse
-	14, // 23: orchestrator.OrchestratorService.RegisterWorker:output_type -> orchestrator.RegisterWorkerResponse
-	16, // 24: orchestrator.OrchestratorService.GetTestStatus:output_type -> orchestrator.TestStatusResponse
-	18, // 25: orchestrator.OrchestratorService.StopTest:output_type -> orchestrator.StopTestResponse
-	21, // [21:26] is the sub-list for method output_type
-	16, // [16:21] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	28, // 15: orchestrator.TestStatusResponse.current_metrics:type_name -> metrics.MetricSnapshot
+	22, // 16: orchestrator.ListWorkersResponse.workers:type_name -> orchestrator.WorkerInfo
+	9,  // 17: orchestrator.OrchestratorService.DistributeTestPlan:input_type -> orchestrator.DistributeRequest
+	11, // 18: orchestrator.OrchestratorService.StreamMetrics:input_type -> orchestrator.StreamMetricsRequest
+	13, // 19: orchestrator.OrchestratorService.RegisterWorker:input_type -> orchestrator.RegisterWorkerRequest
+	15, // 20: orchestrator.OrchestratorService.GetTestStatus:input_type -> orchestrator.TestStatusRequest
+	17, // 21: orchestrator.OrchestratorService.StopTest:input_type -> orchestrator.StopTestRequest
+	29, // 22: orchestrator.OrchestratorService.ReportMetrics:input_type -> metrics.MetricBatch
+	20, // 23: orchestrator.OrchestratorService.ListWorkers:input_type -> orchestrator.ListWorkersRequest
+	10, // 24: orchestrator.OrchestratorService.DistributeTestPlan:output_type -> orchestrator.DistributeResponse
+	12, // 25: orchestrator.OrchestratorService.StreamMetrics:output_type -> orchestrator.StreamMetricsResponse
+	14, // 26: orchestrator.OrchestratorService.RegisterWorker:output_type -> orchestrator.RegisterWorkerResponse
+	16, // 27: orchestrator.OrchestratorService.GetTestStatus:output_type -> orchestrator.TestStatusResponse
+	18, // 28: orchestrator.OrchestratorService.StopTest:output_type -> orchestrator.StopTestResponse
+	19, // 29: orchestrator.OrchestratorService.ReportMetrics:output_type -> orchestrator.ReportMetricsResponse
+	21, // 30: orchestrator.OrchestratorService.ListWorkers:output_type -> orchestrator.ListWorkersResponse
+	24, // [24:31] is the sub-list for method output_type
+	17, // [17:24] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
-func init() { file_proto_orchestrator_proto_init() }
-func file_proto_orchestrator_proto_init() {
-	if File_proto_orchestrator_proto != nil {
+func init() { file_proto_orchestrator_orchestrator_proto_init() }
+func file_proto_orchestrator_orchestrator_proto_init() {
+	if File_proto_orchestrator_orchestrator_proto != nil {
 		return
 	}
-	file_proto_orchestrator_proto_msgTypes[4].OneofWrappers = []any{
+	file_proto_orchestrator_orchestrator_proto_msgTypes[4].OneofWrappers = []any{
 		(*Assertion_StatusCode)(nil),
 		(*Assertion_ResponseTime)(nil),
 		(*Assertion_BodyContains)(nil),
@@ -1355,18 +1584,18 @@ func file_proto_orchestrator_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_orchestrator_proto_rawDesc), len(file_proto_orchestrator_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_orchestrator_orchestrator_proto_rawDesc), len(file_proto_orchestrator_orchestrator_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   23,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_orchestrator_proto_goTypes,
-		DependencyIndexes: file_proto_orchestrator_proto_depIdxs,
-		EnumInfos:         file_proto_orchestrator_proto_enumTypes,
-		MessageInfos:      file_proto_orchestrator_proto_msgTypes,
+		GoTypes:           file_proto_orchestrator_orchestrator_proto_goTypes,
+		DependencyIndexes: file_proto_orchestrator_orchestrator_proto_depIdxs,
+		EnumInfos:         file_proto_orchestrator_orchestrator_proto_enumTypes,
+		MessageInfos:      file_proto_orchestrator_orchestrator_proto_msgTypes,
 	}.Build()
-	File_proto_orchestrator_proto = out.File
-	file_proto_orchestrator_proto_goTypes = nil
-	file_proto_orchestrator_proto_depIdxs = nil
+	File_proto_orchestrator_orchestrator_proto = out.File
+	file_proto_orchestrator_orchestrator_proto_goTypes = nil
+	file_proto_orchestrator_orchestrator_proto_depIdxs = nil
 }

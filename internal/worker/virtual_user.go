@@ -1,9 +1,12 @@
 package worker
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -13,13 +16,13 @@ import (
 
 // VirtualUser represents a single virtual user
 type VirtualUser struct {
-	id        int
-	scenario  *models.HTTPConfig
-	client    *HTTPClient
-	logger    *zap.Logger
-	metrics   *MetricsCollector
-	ctx       context.Context
-	cancel    context.CancelFunc
+	id       int
+	scenario *models.HTTPConfig
+	client   *HTTPClient
+	logger   *zap.Logger
+	metrics  *MetricsCollector
+	ctx      context.Context
+	cancel   context.CancelFunc
 }
 
 // NewVirtualUser creates a new virtual user
@@ -70,7 +73,7 @@ func (vu *VirtualUser) Run(ctx context.Context, duration time.Duration, rampUp t
 			// Execute requests
 			for _, req := range vu.scenario.Requests {
 				if err := vu.executeRequest(ctx, req); err != nil {
-					vu.metrics.RecordError(err)
+					vu.metrics.RecordRequest(false, 0, 0, err.Error())
 					vu.logger.Debug("request failed", zap.Error(err))
 				}
 
@@ -113,8 +116,8 @@ func (vu *VirtualUser) executeRequest(ctx context.Context, req models.Request) e
 
 	// Set body if present
 	if len(req.Body) > 0 {
-		httpReq.Body = http.MaxBytesReader(nil, http.MaxBytesReader(nil, nil, int64(len(req.Body))), int64(len(req.Body)))
-		// TODO: Set body properly
+		httpReq.Body = io.NopCloser(bytes.NewReader(req.Body))
+		httpReq.ContentLength = int64(len(req.Body))
 	}
 
 	start := time.Now()
@@ -122,50 +125,69 @@ func (vu *VirtualUser) executeRequest(ctx context.Context, req models.Request) e
 	duration := time.Since(start)
 
 	if err != nil {
-		vu.metrics.RecordRequest(false, duration, 0)
+		vu.metrics.RecordRequest(false, duration, 0, err.Error())
 		return err
+	}
+
+	// Read body for assertions
+	var bodyBytes []byte
+	if resp.Body != nil {
+		bodyBytes, _ = io.ReadAll(resp.Body)
+		resp.Body.Close()
 	}
 
 	statusCode := resp.StatusCode
 	success := statusCode >= 200 && statusCode < 300
 
 	// Check assertions
+	var assertionFailMsg string
 	for _, assertion := range req.Assertions {
-		if !vu.checkAssertion(assertion, resp, duration) {
+		if !vu.checkAssertion(assertion, resp, duration, bodyBytes) {
 			success = false
+			assertionFailMsg = fmt.Sprintf("assertion %s failed", assertion.Type)
 		}
 	}
 
-	vu.metrics.RecordRequest(success, duration, statusCode)
+	msg := ""
+	if !success && assertionFailMsg != "" {
+		msg = assertionFailMsg
+	} else if !success {
+		msg = fmt.Sprintf("status %d", statusCode)
+	}
+
+	vu.metrics.RecordRequest(success, duration, statusCode, msg)
 
 	return nil
 }
 
 // checkAssertion checks if an assertion passes
-func (vu *VirtualUser) checkAssertion(assertion models.Assertion, resp *http.Response, duration time.Duration) bool {
+func (vu *VirtualUser) checkAssertion(assertion models.Assertion, resp *http.Response, duration time.Duration, body []byte) bool {
 	switch assertion.Type {
 	case models.AssertionTypeStatusCode:
-		expected, ok := assertion.Value.(int)
-		if !ok {
+		var expected int
+		switch v := assertion.Value.(type) {
+		case int:
+			expected = v
+		case int32:
+			expected = int(v)
+		default:
 			return false
 		}
 		return resp.StatusCode == expected
 
 	case models.AssertionTypeResponseTime:
-		percentile, ok := assertion.Value.(string)
-		if !ok {
-			return false
-		}
 		threshold, ok := assertion.Threshold.(time.Duration)
 		if !ok {
 			return false
 		}
-		// TODO: Check against actual percentile from metrics
 		return duration <= threshold
 
 	case models.AssertionTypeBodyContains:
-		// TODO: Read body and check for substring
-		return true
+		substr, ok := assertion.Value.(string)
+		if !ok {
+			return false
+		}
+		return strings.Contains(string(body), substr)
 
 	default:
 		return true

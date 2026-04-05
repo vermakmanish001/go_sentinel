@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v7.34.0
-// source: proto/metrics.proto
+// source: proto/metrics/metrics.proto
 
 package metrics
 
@@ -37,7 +37,7 @@ type MetricSnapshot struct {
 
 func (x *MetricSnapshot) Reset() {
 	*x = MetricSnapshot{}
-	mi := &file_proto_metrics_proto_msgTypes[0]
+	mi := &file_proto_metrics_metrics_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -49,7 +49,7 @@ func (x *MetricSnapshot) String() string {
 func (*MetricSnapshot) ProtoMessage() {}
 
 func (x *MetricSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_metrics_proto_msgTypes[0]
+	mi := &file_proto_metrics_metrics_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -62,7 +62,7 @@ func (x *MetricSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MetricSnapshot.ProtoReflect.Descriptor instead.
 func (*MetricSnapshot) Descriptor() ([]byte, []int) {
-	return file_proto_metrics_proto_rawDescGZIP(), []int{0}
+	return file_proto_metrics_metrics_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *MetricSnapshot) GetRps() *RPSSnapshot {
@@ -127,7 +127,7 @@ type RPSSnapshot struct {
 
 func (x *RPSSnapshot) Reset() {
 	*x = RPSSnapshot{}
-	mi := &file_proto_metrics_proto_msgTypes[1]
+	mi := &file_proto_metrics_metrics_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -139,7 +139,7 @@ func (x *RPSSnapshot) String() string {
 func (*RPSSnapshot) ProtoMessage() {}
 
 func (x *RPSSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_metrics_proto_msgTypes[1]
+	mi := &file_proto_metrics_metrics_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -152,7 +152,7 @@ func (x *RPSSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RPSSnapshot.ProtoReflect.Descriptor instead.
 func (*RPSSnapshot) Descriptor() ([]byte, []int) {
-	return file_proto_metrics_proto_rawDescGZIP(), []int{1}
+	return file_proto_metrics_metrics_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *RPSSnapshot) GetCurrent() float64 {
@@ -200,7 +200,7 @@ type LatencyHistogram struct {
 
 func (x *LatencyHistogram) Reset() {
 	*x = LatencyHistogram{}
-	mi := &file_proto_metrics_proto_msgTypes[2]
+	mi := &file_proto_metrics_metrics_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -212,7 +212,7 @@ func (x *LatencyHistogram) String() string {
 func (*LatencyHistogram) ProtoMessage() {}
 
 func (x *LatencyHistogram) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_metrics_proto_msgTypes[2]
+	mi := &file_proto_metrics_metrics_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -225,7 +225,7 @@ func (x *LatencyHistogram) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LatencyHistogram.ProtoReflect.Descriptor instead.
 func (*LatencyHistogram) Descriptor() ([]byte, []int) {
-	return file_proto_metrics_proto_rawDescGZIP(), []int{2}
+	return file_proto_metrics_metrics_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *LatencyHistogram) GetMinMs() int64 {
@@ -297,7 +297,7 @@ type ErrorRate struct {
 
 func (x *ErrorRate) Reset() {
 	*x = ErrorRate{}
-	mi := &file_proto_metrics_proto_msgTypes[3]
+	mi := &file_proto_metrics_metrics_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -309,7 +309,7 @@ func (x *ErrorRate) String() string {
 func (*ErrorRate) ProtoMessage() {}
 
 func (x *ErrorRate) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_metrics_proto_msgTypes[3]
+	mi := &file_proto_metrics_metrics_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -322,7 +322,7 @@ func (x *ErrorRate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ErrorRate.ProtoReflect.Descriptor instead.
 func (*ErrorRate) Descriptor() ([]byte, []int) {
-	return file_proto_metrics_proto_rawDescGZIP(), []int{3}
+	return file_proto_metrics_metrics_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ErrorRate) GetRate() float64 {
@@ -366,7 +366,7 @@ type MetricPoint struct {
 
 func (x *MetricPoint) Reset() {
 	*x = MetricPoint{}
-	mi := &file_proto_metrics_proto_msgTypes[4]
+	mi := &file_proto_metrics_metrics_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -378,7 +378,7 @@ func (x *MetricPoint) String() string {
 func (*MetricPoint) ProtoMessage() {}
 
 func (x *MetricPoint) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_metrics_proto_msgTypes[4]
+	mi := &file_proto_metrics_metrics_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -391,7 +391,7 @@ func (x *MetricPoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MetricPoint.ProtoReflect.Descriptor instead.
 func (*MetricPoint) Descriptor() ([]byte, []int) {
-	return file_proto_metrics_proto_rawDescGZIP(), []int{4}
+	return file_proto_metrics_metrics_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *MetricPoint) GetName() string {
@@ -431,13 +431,15 @@ type MetricBatch struct {
 	RpsSnapshot      *RPSSnapshot           `protobuf:"bytes,4,opt,name=rps_snapshot,json=rpsSnapshot,proto3" json:"rps_snapshot,omitempty"`
 	ErrorRate        *ErrorRate             `protobuf:"bytes,5,opt,name=error_rate,json=errorRate,proto3" json:"error_rate,omitempty"`
 	BatchTimestampMs int64                  `protobuf:"varint,6,opt,name=batch_timestamp_ms,json=batchTimestampMs,proto3" json:"batch_timestamp_ms,omitempty"`
+	TotalRequests    int64                  `protobuf:"varint,7,opt,name=total_requests,json=totalRequests,proto3" json:"total_requests,omitempty"`
+	TotalErrors      int64                  `protobuf:"varint,8,opt,name=total_errors,json=totalErrors,proto3" json:"total_errors,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
 
 func (x *MetricBatch) Reset() {
 	*x = MetricBatch{}
-	mi := &file_proto_metrics_proto_msgTypes[5]
+	mi := &file_proto_metrics_metrics_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -449,7 +451,7 @@ func (x *MetricBatch) String() string {
 func (*MetricBatch) ProtoMessage() {}
 
 func (x *MetricBatch) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_metrics_proto_msgTypes[5]
+	mi := &file_proto_metrics_metrics_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -462,7 +464,7 @@ func (x *MetricBatch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MetricBatch.ProtoReflect.Descriptor instead.
 func (*MetricBatch) Descriptor() ([]byte, []int) {
-	return file_proto_metrics_proto_rawDescGZIP(), []int{5}
+	return file_proto_metrics_metrics_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *MetricBatch) GetWorkerId() string {
@@ -507,11 +509,25 @@ func (x *MetricBatch) GetBatchTimestampMs() int64 {
 	return 0
 }
 
-var File_proto_metrics_proto protoreflect.FileDescriptor
+func (x *MetricBatch) GetTotalRequests() int64 {
+	if x != nil {
+		return x.TotalRequests
+	}
+	return 0
+}
 
-const file_proto_metrics_proto_rawDesc = "" +
+func (x *MetricBatch) GetTotalErrors() int64 {
+	if x != nil {
+		return x.TotalErrors
+	}
+	return 0
+}
+
+var File_proto_metrics_metrics_proto protoreflect.FileDescriptor
+
+const file_proto_metrics_metrics_proto_rawDesc = "" +
 	"\n" +
-	"\x13proto/metrics.proto\x12\ametrics\"\xaa\x02\n" +
+	"\x1bproto/metrics/metrics.proto\x12\ametrics\"\xaa\x02\n" +
 	"\x0eMetricSnapshot\x12&\n" +
 	"\x03rps\x18\x01 \x01(\v2\x14.metrics.RPSSnapshotR\x03rps\x123\n" +
 	"\alatency\x18\x02 \x01(\v2\x19.metrics.LatencyHistogramR\alatency\x121\n" +
@@ -552,7 +568,7 @@ const file_proto_metrics_proto_rawDesc = "" +
 	"\x06labels\x18\x04 \x03(\v2 .metrics.MetricPoint.LabelsEntryR\x06labels\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xba\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x84\x03\n" +
 	"\vMetricBatch\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12,\n" +
 	"\x06points\x18\x02 \x03(\v2\x14.metrics.MetricPointR\x06points\x12F\n" +
@@ -560,22 +576,24 @@ const file_proto_metrics_proto_rawDesc = "" +
 	"\frps_snapshot\x18\x04 \x01(\v2\x14.metrics.RPSSnapshotR\vrpsSnapshot\x121\n" +
 	"\n" +
 	"error_rate\x18\x05 \x01(\v2\x12.metrics.ErrorRateR\terrorRate\x12,\n" +
-	"\x12batch_timestamp_ms\x18\x06 \x01(\x03R\x10batchTimestampMsB4Z2github.com/vermakmanish001/go_sentinel/proto/metricsb\x06proto3"
+	"\x12batch_timestamp_ms\x18\x06 \x01(\x03R\x10batchTimestampMs\x12%\n" +
+	"\x0etotal_requests\x18\a \x01(\x03R\rtotalRequests\x12!\n" +
+	"\ftotal_errors\x18\b \x01(\x03R\vtotalErrorsB6Z4github.com/vermakmanish001/go_sentinel/proto/metricsb\x06proto3"
 
 var (
-	file_proto_metrics_proto_rawDescOnce sync.Once
-	file_proto_metrics_proto_rawDescData []byte
+	file_proto_metrics_metrics_proto_rawDescOnce sync.Once
+	file_proto_metrics_metrics_proto_rawDescData []byte
 )
 
-func file_proto_metrics_proto_rawDescGZIP() []byte {
-	file_proto_metrics_proto_rawDescOnce.Do(func() {
-		file_proto_metrics_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_metrics_proto_rawDesc), len(file_proto_metrics_proto_rawDesc)))
+func file_proto_metrics_metrics_proto_rawDescGZIP() []byte {
+	file_proto_metrics_metrics_proto_rawDescOnce.Do(func() {
+		file_proto_metrics_metrics_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_metrics_metrics_proto_rawDesc), len(file_proto_metrics_metrics_proto_rawDesc)))
 	})
-	return file_proto_metrics_proto_rawDescData
+	return file_proto_metrics_metrics_proto_rawDescData
 }
 
-var file_proto_metrics_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
-var file_proto_metrics_proto_goTypes = []any{
+var file_proto_metrics_metrics_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_proto_metrics_metrics_proto_goTypes = []any{
 	(*MetricSnapshot)(nil),   // 0: metrics.MetricSnapshot
 	(*RPSSnapshot)(nil),      // 1: metrics.RPSSnapshot
 	(*LatencyHistogram)(nil), // 2: metrics.LatencyHistogram
@@ -585,7 +603,7 @@ var file_proto_metrics_proto_goTypes = []any{
 	nil,                      // 6: metrics.ErrorRate.StatusCodeCountsEntry
 	nil,                      // 7: metrics.MetricPoint.LabelsEntry
 }
-var file_proto_metrics_proto_depIdxs = []int32{
+var file_proto_metrics_metrics_proto_depIdxs = []int32{
 	1, // 0: metrics.MetricSnapshot.rps:type_name -> metrics.RPSSnapshot
 	2, // 1: metrics.MetricSnapshot.latency:type_name -> metrics.LatencyHistogram
 	3, // 2: metrics.MetricSnapshot.error_rate:type_name -> metrics.ErrorRate
@@ -602,26 +620,26 @@ var file_proto_metrics_proto_depIdxs = []int32{
 	0, // [0:9] is the sub-list for field type_name
 }
 
-func init() { file_proto_metrics_proto_init() }
-func file_proto_metrics_proto_init() {
-	if File_proto_metrics_proto != nil {
+func init() { file_proto_metrics_metrics_proto_init() }
+func file_proto_metrics_metrics_proto_init() {
+	if File_proto_metrics_metrics_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_metrics_proto_rawDesc), len(file_proto_metrics_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_metrics_metrics_proto_rawDesc), len(file_proto_metrics_metrics_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_proto_metrics_proto_goTypes,
-		DependencyIndexes: file_proto_metrics_proto_depIdxs,
-		MessageInfos:      file_proto_metrics_proto_msgTypes,
+		GoTypes:           file_proto_metrics_metrics_proto_goTypes,
+		DependencyIndexes: file_proto_metrics_metrics_proto_depIdxs,
+		MessageInfos:      file_proto_metrics_metrics_proto_msgTypes,
 	}.Build()
-	File_proto_metrics_proto = out.File
-	file_proto_metrics_proto_goTypes = nil
-	file_proto_metrics_proto_depIdxs = nil
+	File_proto_metrics_metrics_proto = out.File
+	file_proto_metrics_metrics_proto_goTypes = nil
+	file_proto_metrics_metrics_proto_depIdxs = nil
 }

@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/charmbracelet/bubbletea"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -16,6 +16,8 @@ import (
 	"github.com/vermakmanish001/go_sentinel/internal/tui"
 	"github.com/vermakmanish001/go_sentinel/pkg/config"
 	"github.com/vermakmanish001/go_sentinel/pkg/logger"
+	"github.com/vermakmanish001/go_sentinel/pkg/models"
+	pbmetrics "github.com/vermakmanish001/go_sentinel/proto/metrics"
 	pborchestrator "github.com/vermakmanish001/go_sentinel/proto/orchestrator"
 )
 
@@ -126,12 +128,12 @@ func runTest(cmd *cobra.Command, args []string) error {
 
 	// Start TUI
 	model := tui.NewModel(resp.TestId)
+	p := tea.NewProgram(model, tea.WithAltScreen())
 
 	// Start metrics streaming in background
-	go streamMetrics(client, resp.TestId, model, log)
+	go streamMetrics(client, resp.TestId, p, log)
 
 	// Run TUI
-	p := bubbletea.NewProgram(model, bubbletea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("TUI error: %w", err)
 	}
@@ -167,7 +169,7 @@ func getStatus(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Status: %s\n", resp.Status)
 	fmt.Printf("Active Workers: %d\n", resp.ActiveWorkers)
 	fmt.Printf("Total VUs: %d\n", resp.TotalVus)
-	if resp.CurrentMetrics != nil {
+	if resp.CurrentMetrics != nil && resp.CurrentMetrics.Rps != nil {
 		fmt.Printf("Current RPS: %.2f\n", resp.CurrentMetrics.Rps.Current)
 		fmt.Printf("Error Rate: %.2f%%\n", resp.CurrentMetrics.ErrorRate.Percentage)
 	}
@@ -176,8 +178,43 @@ func getStatus(cmd *cobra.Command, args []string) error {
 }
 
 func listNodes(cmd *cobra.Command, args []string) error {
-	// TODO: Implement node listing
-	fmt.Println("Node listing not yet implemented")
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	conn, err := grpc.Dial(cfg.CLI.OrchestratorURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	client := pborchestrator.NewOrchestratorServiceClient(conn)
+	ctx := context.Background()
+
+	resp, err := client.ListWorkers(ctx, &pborchestrator.ListWorkersRequest{})
+	if err != nil {
+		return err
+	}
+
+	if len(resp.Workers) == 0 {
+		fmt.Println("No workers registered")
+		return nil
+	}
+
+	fmt.Printf("%-24s %-22s %-10s %-12s %-22s\n", "ID", "Address", "Max VUs", "Status", "Last Seen")
+	fmt.Printf("%-24s %-22s %-10s %-12s %-22s\n",
+		"------------------------",
+		"----------------------",
+		"----------",
+		"------------",
+		"----------------------",
+	)
+	for _, w := range resp.Workers {
+		lastSeen := time.UnixMilli(w.LastSeenMs).Format("2006-01-02 15:04:05")
+		fmt.Printf("%-24s %-22s %-10d %-12s %-22s\n", w.WorkerId, w.Address, w.MaxVus, w.Status, lastSeen)
+	}
+
 	return nil
 }
 
@@ -214,7 +251,7 @@ func stopTest(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func streamMetrics(client pborchestrator.OrchestratorServiceClient, testID string, model *tui.Model, log *zap.Logger) {
+func streamMetrics(client pborchestrator.OrchestratorServiceClient, testID string, p *tea.Program, log *zap.Logger) {
 	ctx := context.Background()
 	stream, err := client.StreamMetrics(ctx, &pborchestrator.StreamMetricsRequest{
 		TestId: testID,
@@ -230,15 +267,136 @@ func streamMetrics(client pborchestrator.OrchestratorServiceClient, testID strin
 			log.Error("metrics stream error", zap.Error(err))
 			return
 		}
-		_ = resp // TODO: Convert proto metrics to models and update TUI
+
+		if resp.Snapshot == nil {
+			continue
+		}
+
+		snapshot := protoToSnapshot(resp.Snapshot)
+		p.Send(tui.MetricsUpdateMsg(snapshot))
 	}
 }
 
+// protoToSnapshot converts a proto MetricSnapshot to models.MetricSnapshot
+func protoToSnapshot(s *pbmetrics.MetricSnapshot) models.MetricSnapshot {
+	snap := models.MetricSnapshot{
+		TotalRequests: s.TotalRequests,
+		TotalErrors:   s.TotalErrors,
+		Timestamp:     time.UnixMilli(s.TimestampMs),
+	}
+	if s.Rps != nil {
+		snap.RPS = models.RPSSnapshot{
+			Current:       s.Rps.Current,
+			Average:       s.Rps.Average,
+			Peak:          s.Rps.Peak,
+			WindowSeconds: s.Rps.WindowSeconds,
+		}
+	}
+	if s.Latency != nil {
+		snap.Latency = models.LatencyHistogram{
+			Min:   time.Duration(s.Latency.MinMs) * time.Millisecond,
+			Max:   time.Duration(s.Latency.MaxMs) * time.Millisecond,
+			Mean:  time.Duration(s.Latency.MeanMs) * time.Millisecond,
+			P50:   time.Duration(s.Latency.P50Ms) * time.Millisecond,
+			P95:   time.Duration(s.Latency.P95Ms) * time.Millisecond,
+			P99:   time.Duration(s.Latency.P99Ms) * time.Millisecond,
+			P999:  time.Duration(s.Latency.P999Ms) * time.Millisecond,
+			Count: s.Latency.Count,
+		}
+	}
+	if s.ErrorRate != nil {
+		snap.ErrorRate = models.ErrorRate{
+			Rate:          s.ErrorRate.Rate,
+			Percentage:    s.ErrorRate.Percentage,
+			ErrorMessages: s.ErrorRate.ErrorMessages,
+		}
+	}
+	return snap
+}
+
 func convertScenarioToProto(scenario *runtime.Scenario) *pborchestrator.TestPlan {
-	// TODO: Implement full conversion from scenario to proto
+	stages := make([]*pborchestrator.Stage, len(scenario.Stages))
+	for i, s := range scenario.Stages {
+		stage := &pborchestrator.Stage{
+			Duration:  s.Duration.String(),
+			TargetVus: s.TargetVUs,
+		}
+		if s.RampUp > 0 {
+			stage.RampUp = s.RampUp.String()
+		}
+		stages[i] = stage
+	}
+
+	requests := make([]*pborchestrator.Request, len(scenario.HTTP.Requests))
+	for i, r := range scenario.HTTP.Requests {
+		assertions := make([]*pborchestrator.Assertion, 0, len(r.Assertions))
+		for _, a := range r.Assertions {
+			var protoAssert *pborchestrator.Assertion
+			switch a.Type {
+			case models.AssertionTypeStatusCode:
+				var code int32
+				switch v := a.Value.(type) {
+				case int:
+					code = int32(v)
+				case int32:
+					code = v
+				}
+				protoAssert = &pborchestrator.Assertion{
+					Assertion: &pborchestrator.Assertion_StatusCode{
+						StatusCode: &pborchestrator.StatusCodeAssertion{Expected: code},
+					},
+				}
+			case models.AssertionTypeResponseTime:
+				percentile, _ := a.Value.(string)
+				threshold, _ := a.Threshold.(time.Duration)
+				protoAssert = &pborchestrator.Assertion{
+					Assertion: &pborchestrator.Assertion_ResponseTime{
+						ResponseTime: &pborchestrator.ResponseTimeAssertion{
+							Percentile: percentile,
+							MaxMs:      int32(threshold / time.Millisecond),
+						},
+					},
+				}
+			case models.AssertionTypeBodyContains:
+				substr, _ := a.Value.(string)
+				protoAssert = &pborchestrator.Assertion{
+					Assertion: &pborchestrator.Assertion_BodyContains{
+						BodyContains: &pborchestrator.BodyContainsAssertion{Substring: substr},
+					},
+				}
+			}
+			if protoAssert != nil {
+				assertions = append(assertions, protoAssert)
+			}
+		}
+
+		requests[i] = &pborchestrator.Request{
+			Method:      r.Method,
+			Path:        r.Path,
+			Headers:     r.Headers,
+			Body:        r.Body,
+			Assertions:  assertions,
+			ThinkTimeMs: int32(r.ThinkTime / time.Millisecond),
+		}
+	}
+
+	var maxVUs int32
+	for _, s := range scenario.Stages {
+		if s.TargetVUs > maxVUs {
+			maxVUs = s.TargetVUs
+		}
+	}
+
 	return &pborchestrator.TestPlan{
 		Id:   fmt.Sprintf("test-%d", time.Now().Unix()),
 		Name: scenario.Name,
-		// TODO: Convert stages, HTTP config, etc.
+		Stages: stages,
+		Http: &pborchestrator.HTTPConfig{
+			BaseUrl:  scenario.HTTP.BaseURL,
+			Requests: requests,
+			Headers:  scenario.HTTP.Headers,
+		},
+		Variables:         scenario.Vars,
+		TotalVirtualUsers: maxVUs,
 	}
 }

@@ -4,29 +4,32 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
 
+	pborchestrator "github.com/vermakmanish001/go_sentinel/proto/orchestrator"
 	"github.com/vermakmanish001/go_sentinel/pkg/models"
 )
 
 // Engine is the core load testing engine
 type Engine struct {
-	logger         *zap.Logger
-	pool           *Pool
-	httpClient     *HTTPClient
-	metrics        *MetricsCollector
-	reporter       *Reporter
-	virtualUsers   []*VirtualUser
-	mu             sync.RWMutex
-	currentTestID  string
-	ctx            context.Context
-	cancel         context.CancelFunc
+	logger             *zap.Logger
+	pool               *Pool
+	httpClient         *HTTPClient
+	metrics            *MetricsCollector
+	reporter           *Reporter
+	virtualUsers       []*VirtualUser
+	mu                 sync.RWMutex
+	currentTestID      string
+	ctx                context.Context
+	cancel             context.CancelFunc
+	activeVUs          int32
 }
 
 // NewEngine creates a new load testing engine
-func NewEngine(workerID string, maxVUs int, logger *zap.Logger) *Engine {
+func NewEngine(workerID string, maxVUs int, orchestratorClient pborchestrator.OrchestratorServiceClient, logger *zap.Logger) *Engine {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	pool := NewPool(maxVUs, maxVUs*2, logger)
@@ -34,7 +37,7 @@ func NewEngine(workerID string, maxVUs int, logger *zap.Logger) *Engine {
 
 	httpClient := NewHTTPClient(30*time.Second, logger)
 	metrics := NewMetricsCollector(10 * time.Second)
-	reporter := NewReporter(workerID, metrics, logger)
+	reporter := NewReporter(workerID, metrics, orchestratorClient, logger)
 
 	return &Engine{
 		logger:       logger,
@@ -61,6 +64,10 @@ func (e *Engine) RunTest(ctx context.Context, testID string, plan *models.TestPl
 
 	// Reset metrics
 	e.metrics.Reset()
+
+	// Start reporter
+	e.reporter.Start()
+	defer e.reporter.Stop()
 
 	// Create virtual users
 	e.virtualUsers = make([]*VirtualUser, assignedVUs)
@@ -106,9 +113,11 @@ func (e *Engine) runStage(ctx context.Context, stage models.Stage, totalVUs int3
 
 		vu := e.virtualUsers[i]
 		wg.Add(1)
+		atomic.AddInt32(&e.activeVUs, 1)
 
 		go func(vu *VirtualUser) {
 			defer wg.Done()
+			defer atomic.AddInt32(&e.activeVUs, -1)
 			if err := vu.Run(stageCtx, stage.Duration, stage.RampUp); err != nil {
 				e.logger.Warn("virtual user failed",
 					zap.Int("vu_id", vu.id),
@@ -127,16 +136,24 @@ func (e *Engine) runStage(ctx context.Context, stage models.Stage, totalVUs int3
 
 	select {
 	case <-stageCtx.Done():
-		// Stage timeout or cancellation
 		for _, vu := range e.virtualUsers[:activeVUs] {
 			vu.Stop()
 		}
 		<-done
-		return stageCtx.Err()
+		// If the parent context was cancelled (e.g. StopTest), propagate the error.
+		// If the stage simply ran for its full duration, that is success.
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return nil
 	case <-done:
-		// All VUs completed
 		return nil
 	}
+}
+
+// GetActiveVUs returns the number of currently active virtual users
+func (e *Engine) GetActiveVUs() int32 {
+	return atomic.LoadInt32(&e.activeVUs)
 }
 
 // StopTest stops the current test

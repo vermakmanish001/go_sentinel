@@ -59,4 +59,6 @@ message MetricBatch {
   RPSSnapshot rps_snapshot = 4;
   ErrorRate error_rate = 5;
   int64 batch_timestamp_ms = 6;
+  int64 total_requests = 7;
+  int64 total_errors = 8;
 }

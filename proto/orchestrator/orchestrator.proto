@@ -4,24 +4,30 @@ package orchestrator;
 
 option go_package = "github.com/vermakmanish001/go_sentinel/proto/orchestrator";
 
-import "proto/metrics.proto";
+import "proto/metrics/metrics.proto";
 
 // Orchestrator service for managing distributed load tests
 service OrchestratorService {
   // Submit a test plan to be distributed across workers
   rpc DistributeTestPlan(DistributeRequest) returns (DistributeResponse);
-  
+
   // Stream aggregated metrics from all workers
   rpc StreamMetrics(StreamMetricsRequest) returns (stream StreamMetricsResponse);
-  
+
   // Register a worker node
   rpc RegisterWorker(RegisterWorkerRequest) returns (RegisterWorkerResponse);
-  
+
   // Get current test status
   rpc GetTestStatus(TestStatusRequest) returns (TestStatusResponse);
-  
+
   // Stop a running test
   rpc StopTest(StopTestRequest) returns (StopTestResponse);
+
+  // Report metrics from a worker
+  rpc ReportMetrics(metrics.MetricBatch) returns (ReportMetricsResponse);
+
+  // List registered workers
+  rpc ListWorkers(ListWorkersRequest) returns (ListWorkersResponse);
 }
 
 // Test plan definition
@@ -148,4 +154,26 @@ message StopTestRequest {
 message StopTestResponse {
   bool success = 1;
   string message = 2;
+}
+
+// ReportMetrics response
+message ReportMetricsResponse {
+  bool accepted = 1;
+}
+
+// ListWorkers request
+message ListWorkersRequest {}
+
+// ListWorkers response
+message ListWorkersResponse {
+  repeated WorkerInfo workers = 1;
+}
+
+// Worker information
+message WorkerInfo {
+  string worker_id = 1;
+  string address = 2;
+  int32 max_vus = 3;
+  string status = 4;
+  int64 last_seen_ms = 5;
 }

@@ -4,7 +4,7 @@ package worker;
 
 option go_package = "github.com/vermakmanish001/go_sentinel/proto/worker";
 
-import "proto/orchestrator.proto";
+import "proto/orchestrator/orchestrator.proto";
 
 // Worker service for executing load tests
 service WorkerService {

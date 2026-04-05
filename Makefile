@@ -6,8 +6,8 @@ proto:
 	@mkdir -p proto/orchestrator proto/worker proto/metrics
 	@protoc --go_out=. --go_opt=paths=source_relative \
 		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
-		--proto_path=proto \
-		proto/orchestrator.proto proto/worker.proto proto/metrics.proto
+		--proto_path=. \
+		proto/orchestrator/orchestrator.proto proto/worker/worker.proto proto/metrics/metrics.proto
 
 # Build all binaries
 build: proto

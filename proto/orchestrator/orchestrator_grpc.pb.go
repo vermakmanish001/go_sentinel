@@ -2,12 +2,13 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v7.34.0
-// source: proto/orchestrator.proto
+// source: proto/orchestrator/orchestrator.proto
 
 package orchestrator
 
 import (
 	context "context"
+	metrics "github.com/vermakmanish001/go_sentinel/proto/metrics"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -24,6 +25,8 @@ const (
 	OrchestratorService_RegisterWorker_FullMethodName     = "/orchestrator.OrchestratorService/RegisterWorker"
 	OrchestratorService_GetTestStatus_FullMethodName      = "/orchestrator.OrchestratorService/GetTestStatus"
 	OrchestratorService_StopTest_FullMethodName           = "/orchestrator.OrchestratorService/StopTest"
+	OrchestratorService_ReportMetrics_FullMethodName      = "/orchestrator.OrchestratorService/ReportMetrics"
+	OrchestratorService_ListWorkers_FullMethodName        = "/orchestrator.OrchestratorService/ListWorkers"
 )
 
 // OrchestratorServiceClient is the client API for OrchestratorService service.
@@ -42,6 +45,10 @@ type OrchestratorServiceClient interface {
 	GetTestStatus(ctx context.Context, in *TestStatusRequest, opts ...grpc.CallOption) (*TestStatusResponse, error)
 	// Stop a running test
 	StopTest(ctx context.Context, in *StopTestRequest, opts ...grpc.CallOption) (*StopTestResponse, error)
+	// Report metrics from a worker
+	ReportMetrics(ctx context.Context, in *metrics.MetricBatch, opts ...grpc.CallOption) (*ReportMetricsResponse, error)
+	// List registered workers
+	ListWorkers(ctx context.Context, in *ListWorkersRequest, opts ...grpc.CallOption) (*ListWorkersResponse, error)
 }
 
 type orchestratorServiceClient struct {
@@ -111,6 +118,26 @@ func (c *orchestratorServiceClient) StopTest(ctx context.Context, in *StopTestRe
 	return out, nil
 }
 
+func (c *orchestratorServiceClient) ReportMetrics(ctx context.Context, in *metrics.MetricBatch, opts ...grpc.CallOption) (*ReportMetricsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReportMetricsResponse)
+	err := c.cc.Invoke(ctx, OrchestratorService_ReportMetrics_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *orchestratorServiceClient) ListWorkers(ctx context.Context, in *ListWorkersRequest, opts ...grpc.CallOption) (*ListWorkersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListWorkersResponse)
+	err := c.cc.Invoke(ctx, OrchestratorService_ListWorkers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OrchestratorServiceServer is the server API for OrchestratorService service.
 // All implementations must embed UnimplementedOrchestratorServiceServer
 // for forward compatibility.
@@ -127,6 +154,10 @@ type OrchestratorServiceServer interface {
 	GetTestStatus(context.Context, *TestStatusRequest) (*TestStatusResponse, error)
 	// Stop a running test
 	StopTest(context.Context, *StopTestRequest) (*StopTestResponse, error)
+	// Report metrics from a worker
+	ReportMetrics(context.Context, *metrics.MetricBatch) (*ReportMetricsResponse, error)
+	// List registered workers
+	ListWorkers(context.Context, *ListWorkersRequest) (*ListWorkersResponse, error)
 	mustEmbedUnimplementedOrchestratorServiceServer()
 }
 
@@ -151,6 +182,12 @@ func (UnimplementedOrchestratorServiceServer) GetTestStatus(context.Context, *Te
 }
 func (UnimplementedOrchestratorServiceServer) StopTest(context.Context, *StopTestRequest) (*StopTestResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method StopTest not implemented")
+}
+func (UnimplementedOrchestratorServiceServer) ReportMetrics(context.Context, *metrics.MetricBatch) (*ReportMetricsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReportMetrics not implemented")
+}
+func (UnimplementedOrchestratorServiceServer) ListWorkers(context.Context, *ListWorkersRequest) (*ListWorkersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListWorkers not implemented")
 }
 func (UnimplementedOrchestratorServiceServer) mustEmbedUnimplementedOrchestratorServiceServer() {}
 func (UnimplementedOrchestratorServiceServer) testEmbeddedByValue()                             {}
@@ -256,6 +293,42 @@ func _OrchestratorService_StopTest_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OrchestratorService_ReportMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(metrics.MetricBatch)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorServiceServer).ReportMetrics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorService_ReportMetrics_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorServiceServer).ReportMetrics(ctx, req.(*metrics.MetricBatch))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrchestratorService_ListWorkers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListWorkersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestratorServiceServer).ListWorkers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestratorService_ListWorkers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestratorServiceServer).ListWorkers(ctx, req.(*ListWorkersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // OrchestratorService_ServiceDesc is the grpc.ServiceDesc for OrchestratorService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -279,6 +352,14 @@ var OrchestratorService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "StopTest",
 			Handler:    _OrchestratorService_StopTest_Handler,
 		},
+		{
+			MethodName: "ReportMetrics",
+			Handler:    _OrchestratorService_ReportMetrics_Handler,
+		},
+		{
+			MethodName: "ListWorkers",
+			Handler:    _OrchestratorService_ListWorkers_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -287,5 +368,5 @@ var OrchestratorService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "proto/orchestrator.proto",
+	Metadata: "proto/orchestrator/orchestrator.proto",
 }

@@ -1,7 +1,6 @@
 package orchestrator
 
 import (
-	"context"
 	"sync"
 	"time"
 
@@ -64,8 +63,8 @@ func (ma *MetricsAggregator) UpdateWorkerMetrics(workerID string, batch *pbmetri
 			Rate:       batch.ErrorRate.Rate,
 			Percentage: batch.ErrorRate.Percentage,
 		},
-		TotalRequests: 0, // TODO: Aggregate from batch
-		TotalErrors:   0, // TODO: Aggregate from batch
+		TotalRequests: batch.TotalRequests,
+		TotalErrors:   batch.TotalErrors,
 		Timestamp:     time.UnixMilli(batch.BatchTimestampMs),
 		WorkerID:      workerID,
 	}

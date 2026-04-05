@@ -4,17 +4,24 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/vermakmanish001/go_sentinel/internal/tracer"
 	"github.com/vermakmanish001/go_sentinel/internal/worker"
+	pbmetrics "github.com/vermakmanish001/go_sentinel/proto/metrics"
+	pborchestrator "github.com/vermakmanish001/go_sentinel/proto/orchestrator"
 	pbworker "github.com/vermakmanish001/go_sentinel/proto/worker"
 	"github.com/vermakmanish001/go_sentinel/pkg/config"
 	"github.com/vermakmanish001/go_sentinel/pkg/logger"
@@ -24,9 +31,10 @@ import (
 // WorkerServer implements the worker gRPC service
 type WorkerServer struct {
 	pbworker.UnimplementedWorkerServiceServer
-	engine *worker.Engine
-	logger *zap.Logger
-	workerID string
+	engine    *worker.Engine
+	logger    *zap.Logger
+	workerID  string
+	startTime time.Time
 }
 
 func main() {
@@ -58,7 +66,7 @@ func main() {
 		workerID = fmt.Sprintf("%s-%d", hostname, os.Getpid())
 	}
 
-	log.Info("starting worker", 
+	log.Info("starting worker",
 		zap.String("worker_id", workerID),
 		zap.Int("max_vus", cfg.Worker.MaxVUs),
 	)
@@ -75,8 +83,19 @@ func main() {
 		}
 	}
 
+	// Connect to orchestrator
+	orchURL := cfg.Worker.OrchestratorURL
+	if orchURL == "" {
+		orchURL = "localhost:50051"
+	}
+	orchConn, err := grpc.Dial(orchURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Warn("failed to connect to orchestrator", zap.Error(err))
+	}
+	orchClient := pborchestrator.NewOrchestratorServiceClient(orchConn)
+
 	// Create engine
-	engine := worker.NewEngine(workerID, cfg.Worker.MaxVUs, log)
+	engine := worker.NewEngine(workerID, cfg.Worker.MaxVUs, orchClient, log)
 
 	// Create gRPC server
 	lis, err := net.Listen("tcp", fmt.Sprintf("%s:%d", cfg.Worker.Address, cfg.Worker.Port))
@@ -86,14 +105,45 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 	workerServer := &WorkerServer{
-		engine:   engine,
-		logger:   log,
-		workerID: workerID,
+		engine:    engine,
+		logger:    log,
+		workerID:  workerID,
+		startTime: time.Now(),
 	}
 	pbworker.RegisterWorkerServiceServer(grpcServer, workerServer)
 
+	healthServer := health.NewServer()
+	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
+	healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
+
+	// Start Prometheus metrics server
+	go func() {
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		if err := http.ListenAndServe(":9091", mux); err != nil && err != http.ErrServerClosed {
+			log.Warn("prometheus server error", zap.Error(err))
+		}
+	}()
+
 	// Register with orchestrator
-	go registerWithOrchestrator(workerID, cfg, log)
+	go registerWithOrchestrator(workerID, cfg, orchClient, orchURL, log)
+
+	// Keep LastSeen fresh and preserve accumulated metrics between tests
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			snap := engine.GetMetrics()
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_, _ = orchClient.ReportMetrics(ctx, &pbmetrics.MetricBatch{
+				WorkerId:         workerID,
+				BatchTimestampMs: time.Now().UnixMilli(),
+				TotalRequests:    snap.TotalRequests,
+				TotalErrors:      snap.TotalErrors,
+			})
+			cancel()
+		}
+	}()
 
 	// Start server
 	log.Info("worker started", zap.String("address", lis.Addr().String()))
@@ -121,14 +171,14 @@ func (s *WorkerServer) RunTest(ctx context.Context, req *pbworker.RunRequest) (*
 		zap.Int32("assigned_vus", req.AssignedVus),
 	)
 
-	// Convert proto plan to models (simplified - TODO: full conversion)
-	plan := &models.TestPlan{
-		ID:   req.TestId,
-		Stages: []models.Stage{}, // TODO: Convert from req.Plan
-		HTTP: models.HTTPConfig{
-			BaseURL:  "", // TODO: Extract from req.Plan
-			Requests: []models.Request{},
-		},
+	if req.Plan == nil {
+		return &pbworker.RunResponse{Success: false, Message: "plan is required"}, nil
+	}
+
+	// Convert proto plan to models
+	plan, err := convertProtoPlan(req.Plan)
+	if err != nil {
+		return &pbworker.RunResponse{Success: false, Message: err.Error()}, nil
 	}
 
 	// Run test in goroutine
@@ -146,7 +196,6 @@ func (s *WorkerServer) RunTest(ctx context.Context, req *pbworker.RunRequest) (*
 
 // Heartbeat sends heartbeat to orchestrator
 func (s *WorkerServer) Heartbeat(ctx context.Context, req *pbworker.HeartbeatRequest) (*pbworker.HeartbeatResponse, error) {
-	// TODO: Implement heartbeat logic
 	return &pbworker.HeartbeatResponse{
 		Acknowledged: true,
 		Message:      "heartbeat received",
@@ -155,16 +204,14 @@ func (s *WorkerServer) Heartbeat(ctx context.Context, req *pbworker.HeartbeatReq
 
 // GetStatus returns worker status
 func (s *WorkerServer) GetStatus(ctx context.Context, req *pbworker.StatusRequest) (*pbworker.StatusResponse, error) {
-	metrics := s.engine.GetMetrics()
-	
-	status := &pbworker.WorkerStatus{
+	workerStatus := &pbworker.WorkerStatus{
 		Status:        pbworker.WorkerStatus_RUNNING,
-		ActiveVus:     int32(0), // TODO: Get from engine
-		UptimeSeconds: int64(0), // TODO: Calculate uptime
+		ActiveVus:     s.engine.GetActiveVUs(),
+		UptimeSeconds: int64(time.Since(s.startTime).Seconds()),
 	}
 
 	return &pbworker.StatusResponse{
-		Status: status,
+		Status: workerStatus,
 	}, nil
 }
 
@@ -183,12 +230,120 @@ func (s *WorkerServer) StopTest(ctx context.Context, req *pbworker.StopRequest) 
 	}, nil
 }
 
-// registerWithOrchestrator registers this worker with the orchestrator
-func registerWithOrchestrator(workerID string, cfg *config.Config, log *zap.Logger) {
-	// TODO: Implement registration via gRPC
-	// This would connect to the orchestrator and call RegisterWorker
-	log.Info("registering with orchestrator", zap.String("orchestrator_url", cfg.Worker.OrchestratorURL))
-	
-	// For now, just log
-	time.Sleep(1 * time.Second)
+// registerWithOrchestrator registers this worker with the orchestrator (with retry)
+func registerWithOrchestrator(workerID string, cfg *config.Config, client pborchestrator.OrchestratorServiceClient, orchURL string, log *zap.Logger) {
+	log.Info("registering with orchestrator", zap.String("orchestrator_url", orchURL))
+
+	address := fmt.Sprintf("%s:%d", cfg.Worker.Address, cfg.Worker.Port)
+
+	for attempt := 1; attempt <= 3; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_, err := client.RegisterWorker(ctx, &pborchestrator.RegisterWorkerRequest{
+			WorkerId: workerID,
+			Address:  address,
+			MaxVus:   int32(cfg.Worker.MaxVUs),
+		})
+		cancel()
+
+		if err == nil {
+			log.Info("registered with orchestrator", zap.String("worker_id", workerID))
+			return
+		}
+
+		log.Warn("failed to register with orchestrator",
+			zap.Int("attempt", attempt),
+			zap.Error(err),
+		)
+
+		if attempt < 3 {
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	log.Error("failed to register with orchestrator after 3 attempts")
+}
+
+// convertProtoPlan converts a proto TestPlan to models.TestPlan
+func convertProtoPlan(protoPlan *pborchestrator.TestPlan) (*models.TestPlan, error) {
+	stages := make([]models.Stage, 0, len(protoPlan.Stages))
+	for _, protoStage := range protoPlan.Stages {
+		duration, err := time.ParseDuration(protoStage.Duration)
+		if err != nil {
+			return nil, fmt.Errorf("invalid duration %q: %w", protoStage.Duration, err)
+		}
+
+		stage := models.Stage{
+			Duration:  duration,
+			TargetVUs: protoStage.TargetVus,
+		}
+
+		if protoStage.RampUp != "" {
+			rampUp, err := time.ParseDuration(protoStage.RampUp)
+			if err != nil {
+				return nil, fmt.Errorf("invalid ramp_up %q: %w", protoStage.RampUp, err)
+			}
+			stage.RampUp = rampUp
+		}
+
+		stages = append(stages, stage)
+	}
+
+	var requests []models.Request
+	if protoPlan.Http != nil {
+		requests = make([]models.Request, 0, len(protoPlan.Http.Requests))
+		for _, protoReq := range protoPlan.Http.Requests {
+			req := models.Request{
+				Method:     protoReq.Method,
+				Path:       protoReq.Path,
+				Headers:    protoReq.Headers,
+				Body:       protoReq.Body,
+				ThinkTime:  time.Duration(protoReq.ThinkTimeMs) * time.Millisecond,
+				Assertions: []models.Assertion{},
+			}
+
+			for _, protoAssert := range protoReq.Assertions {
+				assertion := models.Assertion{}
+				switch a := protoAssert.Assertion.(type) {
+				case *pborchestrator.Assertion_StatusCode:
+					assertion.Type = models.AssertionTypeStatusCode
+					assertion.Value = int(a.StatusCode.Expected)
+				case *pborchestrator.Assertion_ResponseTime:
+					assertion.Type = models.AssertionTypeResponseTime
+					assertion.Value = a.ResponseTime.Percentile
+					assertion.Threshold = time.Duration(a.ResponseTime.MaxMs) * time.Millisecond
+				case *pborchestrator.Assertion_BodyContains:
+					assertion.Type = models.AssertionTypeBodyContains
+					assertion.Value = a.BodyContains.Substring
+				}
+				if assertion.Type != "" {
+					req.Assertions = append(req.Assertions, assertion)
+				}
+			}
+
+			requests = append(requests, req)
+		}
+	}
+
+	baseURL := ""
+	var headers map[string]string
+	var timeout time.Duration
+	if protoPlan.Http != nil {
+		baseURL = protoPlan.Http.BaseUrl
+		headers = protoPlan.Http.Headers
+		timeout = time.Duration(protoPlan.Http.TimeoutMs) * time.Millisecond
+	}
+
+	return &models.TestPlan{
+		ID:   protoPlan.Id,
+		Name: protoPlan.Name,
+		Stages: stages,
+		HTTP: models.HTTPConfig{
+			BaseURL:  baseURL,
+			Requests: requests,
+			Headers:  headers,
+			Timeout:  timeout,
+		},
+		Variables:         protoPlan.Variables,
+		TotalVirtualUsers: protoPlan.TotalVirtualUsers,
+	}, nil
 }

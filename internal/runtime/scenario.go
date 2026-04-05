@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/vermakmanish001/go_sentinel/pkg/models"
 )
 
