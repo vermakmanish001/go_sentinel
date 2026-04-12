@@ -29,8 +29,11 @@ func Setup(ctx context.Context, serviceName, environment, endpoint string, logge
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
 
-	// Create OTLP exporter
-	conn, err := grpc.DialContext(ctx, endpoint,
+	// Create OTLP exporter — use a bounded timeout so a slow Jaeger doesn't
+	// block the orchestrator from starting.
+	dialCtx, dialCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer dialCancel()
+	conn, err := grpc.DialContext(dialCtx, endpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 	)

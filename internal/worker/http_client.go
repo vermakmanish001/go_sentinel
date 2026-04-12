@@ -1,7 +1,6 @@
 package worker
 
 import (
-	"io"
 	"net"
 	"net/http"
 	"time"
@@ -56,14 +55,6 @@ func (c *HTTPClient) Do(req *http.Request) (*http.Response, error) {
 		)
 		return nil, err
 	}
-
-	// Drain response body to allow connection reuse
-	go func() {
-		if resp.Body != nil {
-			io.Copy(io.Discard, resp.Body)
-			resp.Body.Close()
-		}
-	}()
 
 	c.logger.Debug("HTTP request completed",
 		zap.String("method", req.Method),

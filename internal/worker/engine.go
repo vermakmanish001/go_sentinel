@@ -114,10 +114,12 @@ func (e *Engine) runStage(ctx context.Context, stage models.Stage, totalVUs int3
 		vu := e.virtualUsers[i]
 		wg.Add(1)
 		atomic.AddInt32(&e.activeVUs, 1)
+		promActiveVUs.Inc()
 
 		go func(vu *VirtualUser) {
 			defer wg.Done()
 			defer atomic.AddInt32(&e.activeVUs, -1)
+			defer promActiveVUs.Dec()
 			if err := vu.Run(stageCtx, stage.Duration, stage.RampUp); err != nil {
 				e.logger.Warn("virtual user failed",
 					zap.Int("vu_id", vu.id),

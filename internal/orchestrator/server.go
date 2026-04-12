@@ -303,6 +303,7 @@ func (s *Server) ReportMetrics(ctx context.Context, batch *pbmetrics.MetricBatch
 	}
 	s.metricsAggregator.UpdateWorkerMetrics(batch.WorkerId, batch)
 	s.nodeManager.UpdateLastSeen(batch.WorkerId)
+	s.nodeManager.UpdateStatus(batch.WorkerId, models.WorkerStatusRunning)
 	return &pborchestrator.ReportMetricsResponse{Accepted: true}, nil
 }
 

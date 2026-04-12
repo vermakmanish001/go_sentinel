@@ -28,8 +28,8 @@ type tickMsg time.Time
 // MetricsUpdateMsg updates metrics
 type MetricsUpdateMsg models.MetricSnapshot
 
-// nodesUpdateMsg updates nodes
-type nodesUpdateMsg []*models.WorkerNode
+// NodesUpdateMsg updates nodes
+type NodesUpdateMsg []*models.WorkerNode
 
 // NewModel creates a new dashboard model
 func NewModel(testID string) *Model {
@@ -71,7 +71,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.metricsView.UpdateMetrics(m.metrics)
 		return m, nil
 
-	case nodesUpdateMsg:
+	case NodesUpdateMsg:
 		m.nodes = []*models.WorkerNode(msg)
 		m.nodesView.UpdateNodes(m.nodes)
 		return m, nil

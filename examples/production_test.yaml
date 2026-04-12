@@ -1,0 +1,40 @@
+name: Production API Test
+
+# Start conservative - increase VUs only after confirming it works
+stages:
+  - duration: 30s
+    target_vus: 5       # warm up
+  - duration: 2m
+    target_vus: 20      # main load
+  - duration: 30s
+    target_vus: 5       # cool down
+
+http:
+  base_url: "https://your-api.com"   # ← change this
+  timeout: 15s
+  headers:
+    Authorization: "Bearer YOUR_TOKEN_HERE"    # ← JWT / Bearer token
+    Content-Type: "application/json"
+    Accept: "application/json"
+    # X-API-Key: "your-api-key"               # ← or API key style
+
+  requests:
+    - method: GET
+      path: /api/v1/health
+      assertions:
+        - status_code: 200
+        - response_time_p99_ms: 1000
+
+    - method: GET
+      path: /api/v1/users
+      think_time: 500ms    # wait between requests (be polite to prod)
+      assertions:
+        - status_code: 200
+        - response_time_p99_ms: 2000
+
+    # POST example
+    # - method: POST
+    #   path: /api/v1/orders
+    #   think_time: 1s
+    #   assertions:
+    #     - status_code: 201

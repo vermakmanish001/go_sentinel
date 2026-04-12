@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.22-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 WORKDIR /build
 
@@ -14,7 +14,10 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o worker ./cmd/worker
 
 # Final stage
-FROM scratch
+FROM alpine:3.19
+
+# Install CA certificates so workers can make HTTPS requests
+RUN apk --no-cache add ca-certificates tzdata
 
 COPY --from=builder /build/worker /worker
 

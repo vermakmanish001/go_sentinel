@@ -133,6 +133,29 @@ func runTest(cmd *cobra.Command, args []string) error {
 	// Start metrics streaming in background
 	go streamMetrics(client, resp.TestId, p, log)
 
+	// Poll worker nodes every 3 seconds and send to TUI
+	go func() {
+		for {
+			time.Sleep(3 * time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			r, err := client.ListWorkers(ctx, &pborchestrator.ListWorkersRequest{})
+			cancel()
+			if err != nil {
+				continue
+			}
+			nodes := make([]*models.WorkerNode, 0, len(r.Workers))
+			for _, w := range r.Workers {
+				nodes = append(nodes, &models.WorkerNode{
+					ID:      w.WorkerId,
+					Address: w.Address,
+					MaxVUs:  w.MaxVus,
+					Status:  models.WorkerStatus(w.Status),
+				})
+			}
+			p.Send(tui.NodesUpdateMsg(nodes))
+		}
+	}()
+
 	// Run TUI
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("TUI error: %w", err)

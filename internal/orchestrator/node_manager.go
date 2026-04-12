@@ -182,6 +182,15 @@ func (nm *NodeManager) UpdateLastSeen(nodeID string) {
 	}
 }
 
+// UpdateStatus updates the status of a node
+func (nm *NodeManager) UpdateStatus(nodeID string, status models.WorkerStatus) {
+	nm.mu.Lock()
+	defer nm.mu.Unlock()
+	if node, ok := nm.nodes[nodeID]; ok {
+		node.Status = status
+	}
+}
+
 // Shutdown shuts down the node manager
 func (nm *NodeManager) Shutdown() error {
 	nm.cancel()

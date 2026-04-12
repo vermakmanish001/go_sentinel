@@ -1,0 +1,25 @@
+name: JSONPlaceholder API Test
+
+stages:
+  - duration: 30s
+    target_vus: 5
+  - duration: 1m
+    target_vus: 10
+  - duration: 30s
+    target_vus: 5
+
+http:
+  base_url: "https://jsonplaceholder.typicode.com"
+  timeout: 15s
+  requests:
+    - method: GET
+      path: /posts/1
+      assertions:
+        - status_code: 200
+        - response_time_p99_ms: 3000
+    - method: GET
+      path: /users/1
+      think_time: 200ms
+      assertions:
+        - status_code: 200
+        - response_time_p99_ms: 3000

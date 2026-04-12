@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -91,8 +92,10 @@ func Load() (*Config, error) {
 	viper.SetDefault("logging.level", "info")
 	viper.SetDefault("logging.development", false)
 
-	// Read from environment
+	// Read from environment — replace dots with underscores so that
+	// "worker.orchestrator_url" maps to GOSENTINEL_WORKER_ORCHESTRATOR_URL.
 	viper.SetEnvPrefix("GOSENTINEL")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 
 	// Read from config file if present

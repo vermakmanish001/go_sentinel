@@ -4,8 +4,28 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/vermakmanish001/go_sentinel/internal/tracer"
 	"github.com/vermakmanish001/go_sentinel/pkg/models"
+)
+
+var (
+	promRequestsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "gosentinel_requests_total",
+		Help: "Total number of HTTP requests made by workers",
+	}, []string{"status"})
+
+	promRequestDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:    "gosentinel_request_duration_seconds",
+		Help:    "HTTP request latency in seconds",
+		Buckets: []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5},
+	})
+
+	promActiveVUs = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "gosentinel_active_vus",
+		Help: "Number of currently active virtual users",
+	})
 )
 
 // MetricsCollector collects metrics from virtual users
@@ -55,6 +75,7 @@ func (mc *MetricsCollector) RecordRequest(success bool, duration time.Duration, 
 	mc.totalRequests++
 	if duration > 0 {
 		mc.aggregator.Record(duration)
+		promRequestDuration.Observe(duration.Seconds())
 	}
 
 	if !success {
@@ -62,6 +83,9 @@ func (mc *MetricsCollector) RecordRequest(success bool, duration time.Duration, 
 		if message != "" && len(mc.errorMessages) < 100 {
 			mc.errorMessages = append(mc.errorMessages, message)
 		}
+		promRequestsTotal.WithLabelValues("error").Inc()
+	} else {
+		promRequestsTotal.WithLabelValues("success").Inc()
 	}
 
 	mc.statusCodes[statusCode]++

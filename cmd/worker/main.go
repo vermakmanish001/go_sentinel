@@ -234,7 +234,16 @@ func (s *WorkerServer) StopTest(ctx context.Context, req *pbworker.StopRequest) 
 func registerWithOrchestrator(workerID string, cfg *config.Config, client pborchestrator.OrchestratorServiceClient, orchURL string, log *zap.Logger) {
 	log.Info("registering with orchestrator", zap.String("orchestrator_url", orchURL))
 
-	address := fmt.Sprintf("%s:%d", cfg.Worker.Address, cfg.Worker.Port)
+	// Use the container hostname so the orchestrator can dial back to us.
+	// cfg.Worker.Address is typically "0.0.0.0" (listen-all), which is not
+	// dialable from another container.
+	host := cfg.Worker.Address
+	if host == "" || host == "0.0.0.0" {
+		if h, err := os.Hostname(); err == nil {
+			host = h
+		}
+	}
+	address := fmt.Sprintf("%s:%d", host, cfg.Worker.Port)
 
 	for attempt := 1; attempt <= 3; attempt++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
