@@ -52,44 +52,44 @@ func (s *Scenario) Validate() error {
 
 // YAMLStage represents a stage in YAML format
 type YAMLStage struct {
-	Duration  string `yaml:"duration"`
-	TargetVUs int32  `yaml:"target_vus"`
-	RampUp    string `yaml:"ramp_up,omitempty"`
+	Duration  string `yaml:"duration" json:"duration"`
+	TargetVUs int32  `yaml:"target_vus" json:"target_vus"`
+	RampUp    string `yaml:"ramp_up,omitempty" json:"ramp_up,omitempty"`
 }
 
 // YAMLHTTPConfig represents HTTP config in YAML format
 type YAMLHTTPConfig struct {
-	BaseURL  string            `yaml:"base_url"`
-	Requests []YAMLRequest     `yaml:"requests"`
-	Headers  map[string]string `yaml:"headers,omitempty"`
-	Timeout  string            `yaml:"timeout,omitempty"`
+	BaseURL  string            `yaml:"base_url" json:"base_url"`
+	Requests []YAMLRequest     `yaml:"requests" json:"requests"`
+	Headers  map[string]string `yaml:"headers,omitempty" json:"headers,omitempty"`
+	Timeout  string            `yaml:"timeout,omitempty" json:"timeout,omitempty"`
 }
 
 // YAMLRequest represents a request in YAML format
 type YAMLRequest struct {
-	Method     string            `yaml:"method"`
-	Path       string            `yaml:"path"`
-	Headers    map[string]string `yaml:"headers,omitempty"`
-	Body       string            `yaml:"body,omitempty"`
-	Assertions []YAMLAssertion   `yaml:"assertions,omitempty"`
-	ThinkTime  string            `yaml:"think_time,omitempty"`
+	Method     string            `yaml:"method" json:"method"`
+	Path       string            `yaml:"path" json:"path"`
+	Headers    map[string]string `yaml:"headers,omitempty" json:"headers,omitempty"`
+	Body       string            `yaml:"body,omitempty" json:"body,omitempty"`
+	Assertions []YAMLAssertion   `yaml:"assertions,omitempty" json:"assertions,omitempty"`
+	ThinkTime  string            `yaml:"think_time,omitempty" json:"think_time,omitempty"`
 }
 
 // YAMLAssertion represents an assertion in YAML format
 type YAMLAssertion struct {
-	StatusCode       *int32  `yaml:"status_code,omitempty"`
-	ResponseTimeP99  *int32  `yaml:"response_time_p99_ms,omitempty"`
-	ResponseTimeP95  *int32  `yaml:"response_time_p95_ms,omitempty"`
-	ResponseTimeP50  *int32  `yaml:"response_time_p50_ms,omitempty"`
-	BodyContains     *string `yaml:"body_contains,omitempty"`
+	StatusCode      *int32  `yaml:"status_code,omitempty" json:"status_code,omitempty"`
+	ResponseTimeP99 *int32  `yaml:"response_time_p99_ms,omitempty" json:"response_time_p99_ms,omitempty"`
+	ResponseTimeP95 *int32  `yaml:"response_time_p95_ms,omitempty" json:"response_time_p95_ms,omitempty"`
+	ResponseTimeP50 *int32  `yaml:"response_time_p50_ms,omitempty" json:"response_time_p50_ms,omitempty"`
+	BodyContains    *string `yaml:"body_contains,omitempty" json:"body_contains,omitempty"`
 }
 
 // YAMLTestPlan represents the root YAML structure
 type YAMLTestPlan struct {
-	Name     string            `yaml:"name,omitempty"`
-	Stages   []YAMLStage       `yaml:"stages"`
-	HTTP     YAMLHTTPConfig    `yaml:"http"`
-	Variables map[string]string `yaml:"variables,omitempty"`
+	Name      string            `yaml:"name,omitempty" json:"name,omitempty"`
+	Stages    []YAMLStage       `yaml:"stages" json:"stages"`
+	HTTP      YAMLHTTPConfig    `yaml:"http" json:"http"`
+	Variables map[string]string `yaml:"variables,omitempty" json:"variables,omitempty"`
 }
 
 // ParseDuration parses a duration string (e.g., "30s", "1m")
@@ -122,7 +122,7 @@ func ParseRequest(yamlReq YAMLRequest, vars map[string]string) (models.Request, 
 	// Parse assertions
 	for _, yamlAssert := range yamlReq.Assertions {
 		assertion := models.Assertion{}
-		
+
 		if yamlAssert.StatusCode != nil {
 			assertion.Type = models.AssertionTypeStatusCode
 			assertion.Value = *yamlAssert.StatusCode

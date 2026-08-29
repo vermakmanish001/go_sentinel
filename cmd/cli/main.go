@@ -108,7 +108,7 @@ func runTest(cmd *cobra.Command, args []string) error {
 	client := pborchestrator.NewOrchestratorServiceClient(conn)
 
 	// Convert scenario to proto plan
-	plan := convertScenarioToProto(scenario)
+	plan := runtime.ScenarioToProto(scenario, fmt.Sprintf("test-%d", time.Now().Unix()))
 
 	// Submit test plan
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -335,91 +335,4 @@ func protoToSnapshot(s *pbmetrics.MetricSnapshot) models.MetricSnapshot {
 		}
 	}
 	return snap
-}
-
-func convertScenarioToProto(scenario *runtime.Scenario) *pborchestrator.TestPlan {
-	stages := make([]*pborchestrator.Stage, len(scenario.Stages))
-	for i, s := range scenario.Stages {
-		stage := &pborchestrator.Stage{
-			Duration:  s.Duration.String(),
-			TargetVus: s.TargetVUs,
-		}
-		if s.RampUp > 0 {
-			stage.RampUp = s.RampUp.String()
-		}
-		stages[i] = stage
-	}
-
-	requests := make([]*pborchestrator.Request, len(scenario.HTTP.Requests))
-	for i, r := range scenario.HTTP.Requests {
-		assertions := make([]*pborchestrator.Assertion, 0, len(r.Assertions))
-		for _, a := range r.Assertions {
-			var protoAssert *pborchestrator.Assertion
-			switch a.Type {
-			case models.AssertionTypeStatusCode:
-				var code int32
-				switch v := a.Value.(type) {
-				case int:
-					code = int32(v)
-				case int32:
-					code = v
-				}
-				protoAssert = &pborchestrator.Assertion{
-					Assertion: &pborchestrator.Assertion_StatusCode{
-						StatusCode: &pborchestrator.StatusCodeAssertion{Expected: code},
-					},
-				}
-			case models.AssertionTypeResponseTime:
-				percentile, _ := a.Value.(string)
-				threshold, _ := a.Threshold.(time.Duration)
-				protoAssert = &pborchestrator.Assertion{
-					Assertion: &pborchestrator.Assertion_ResponseTime{
-						ResponseTime: &pborchestrator.ResponseTimeAssertion{
-							Percentile: percentile,
-							MaxMs:      int32(threshold / time.Millisecond),
-						},
-					},
-				}
-			case models.AssertionTypeBodyContains:
-				substr, _ := a.Value.(string)
-				protoAssert = &pborchestrator.Assertion{
-					Assertion: &pborchestrator.Assertion_BodyContains{
-						BodyContains: &pborchestrator.BodyContainsAssertion{Substring: substr},
-					},
-				}
-			}
-			if protoAssert != nil {
-				assertions = append(assertions, protoAssert)
-			}
-		}
-
-		requests[i] = &pborchestrator.Request{
-			Method:      r.Method,
-			Path:        r.Path,
-			Headers:     r.Headers,
-			Body:        r.Body,
-			Assertions:  assertions,
-			ThinkTimeMs: int32(r.ThinkTime / time.Millisecond),
-		}
-	}
-
-	var maxVUs int32
-	for _, s := range scenario.Stages {
-		if s.TargetVUs > maxVUs {
-			maxVUs = s.TargetVUs
-		}
-	}
-
-	return &pborchestrator.TestPlan{
-		Id:   fmt.Sprintf("test-%d", time.Now().Unix()),
-		Name: scenario.Name,
-		Stages: stages,
-		Http: &pborchestrator.HTTPConfig{
-			BaseUrl:  scenario.HTTP.BaseURL,
-			Requests: requests,
-			Headers:  scenario.HTTP.Headers,
-		},
-		Variables:         scenario.Vars,
-		TotalVirtualUsers: maxVUs,
-	}
 }

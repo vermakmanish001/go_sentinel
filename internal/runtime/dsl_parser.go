@@ -41,6 +41,13 @@ func (p *Parser) Parse(data []byte) (*Scenario, error) {
 		return nil, fmt.Errorf("failed to parse YAML: %w", err)
 	}
 
+	return p.FromSpec(yamlPlan)
+}
+
+// FromSpec converts an already-decoded plan into a validated Scenario. YAML
+// files and JSON submitted to the HTTP API both land here, so both are subject
+// to identical variable substitution and validation.
+func (p *Parser) FromSpec(yamlPlan YAMLTestPlan) (*Scenario, error) {
 	scenario := &Scenario{
 		Name:   yamlPlan.Name,
 		Stages: []models.Stage{},
