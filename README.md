@@ -98,6 +98,20 @@ make dev-ui                  # terminal 2: Vite with hot reload on :5173
 Vite proxies `/api` to the Go server, so the browser sees one origin and no CORS
 configuration is needed.
 
+### Security
+
+Every endpoint that reads data or drives the fleet requires a session; only
+health and the login endpoints are open. Passwords are Argon2id, sessions are
+random tokens in an `HttpOnly` cookie, and the database stores only a hash of
+each token. With auth enabled and no accounts, the server refuses to start
+rather than coming up unprotected.
+
+A **target allowlist** restricts which hosts a plan may point at. Cloud instance
+metadata is blocked even when the list is empty. An empty list means any host and
+logs a startup warning — fine locally, not for a deployment.
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
 ### API
 
 | Method | Path | Purpose |
@@ -107,7 +121,9 @@ configuration is needed.
 | `GET` | `/api/runs/{id}/stream` | Server-Sent Events: `metrics`, `status`, `end` |
 | `POST` | `/api/runs/{id}/stop` | Stop a run on every assigned worker |
 | `GET` | `/api/workers` | Registered workers and total VU capacity |
-| `GET` | `/api/health` | Liveness plus orchestrator reachability |
+| `GET` | `/api/health` | Liveness plus orchestrator reachability (open) |
+| `POST` | `/api/auth/login` / `logout` | Session management (open) |
+| `GET` | `/api/auth/me` | Whether auth is required, and who is signed in (open) |
 | `GET` | `/api/runs` | Run history, newest first (`?limit`, `?offset`) |
 | `GET` | `/api/runs/{id}/series` | Stored per-second samples, for charting |
 | `DELETE` | `/api/runs/{id}` | Delete a run and its samples |

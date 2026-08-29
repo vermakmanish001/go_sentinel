@@ -154,3 +154,11 @@ button.icon:hover:not(:disabled) { color: var(--bad); }
 .status.queued { color: var(--accent); }
 .pill.queued { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
 .pill.cancelled { color: var(--muted); }
+
+.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.login { width: 100%; max-width: 340px; }
+.login h1 { font-size: 20px; margin: 0 0 4px; }
+.login .hint { margin: 0 0 18px; }
+.login button.primary { width: 100%; margin-top: 6px; }
+.account { margin-left: auto; display: flex; align-items: center; gap: 10px;
+           font-size: 12px; color: var(--muted); }

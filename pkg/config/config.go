@@ -44,8 +44,24 @@ type APIConfig struct {
 	Address         string
 	Port            int
 	OrchestratorURL string
-	// DBPath is the SQLite file holding run history and saved plans.
+	// DBPath is the SQLite file holding run history, saved plans and users.
 	DBPath string
+
+	// AuthEnabled gates every endpoint that reads data or drives the fleet.
+	AuthEnabled bool
+	SessionTTL  time.Duration
+	// BootstrapUser/Password create the first account when the database has
+	// none, so a fresh deployment is reachable without a manual step.
+	BootstrapUser     string
+	BootstrapPassword string
+
+	// AllowedTargets restricts which hosts a plan may point at. Empty means
+	// unrestricted, which is logged as a warning at startup.
+	AllowedTargets []string
+
+	// TLSCert/TLSKey serve HTTPS directly; leave empty behind a TLS proxy.
+	TLSCert string
+	TLSKey  string
 }
 
 // CLIConfig represents CLI-specific configuration
@@ -92,6 +108,9 @@ func Load() (*Config, error) {
 	viper.SetDefault("api.port", 8090)
 	viper.SetDefault("api.orchestrator_url", "localhost:50051")
 	viper.SetDefault("api.db_path", "gosentinel.db")
+	viper.SetDefault("api.auth_enabled", true)
+	viper.SetDefault("api.session_ttl", "168h")
+	viper.SetDefault("api.allowed_targets", []string{})
 
 	viper.SetDefault("cli.orchestrator_url", "localhost:50051")
 	viper.SetDefault("cli.refresh_interval", "1s")
@@ -150,6 +169,13 @@ func Load() (*Config, error) {
 	cfg.API.Port = viper.GetInt("api.port")
 	cfg.API.OrchestratorURL = viper.GetString("api.orchestrator_url")
 	cfg.API.DBPath = viper.GetString("api.db_path")
+	cfg.API.AuthEnabled = viper.GetBool("api.auth_enabled")
+	cfg.API.SessionTTL = viper.GetDuration("api.session_ttl")
+	cfg.API.BootstrapUser = viper.GetString("api.bootstrap_user")
+	cfg.API.BootstrapPassword = viper.GetString("api.bootstrap_password")
+	cfg.API.AllowedTargets = stringSlice("api.allowed_targets")
+	cfg.API.TLSCert = viper.GetString("api.tls_cert")
+	cfg.API.TLSKey = viper.GetString("api.tls_key")
 
 	// CLI config
 	cfg.CLI.OrchestratorURL = viper.GetString("cli.orchestrator_url")
@@ -171,6 +197,23 @@ func Load() (*Config, error) {
 	cfg.Logging.Development = viper.GetBool("logging.development")
 
 	return cfg, nil
+}
+
+// stringSlice reads a list setting, splitting comma-separated values.
+//
+// Viper splits a YAML sequence for us but hands an environment variable back as
+// a single string, so GOSENTINEL_API_ALLOWED_TARGETS="a,b" would otherwise
+// become one pattern named "a,b" that matches nothing.
+func stringSlice(key string) []string {
+	var out []string
+	for _, raw := range viper.GetStringSlice(key) {
+		for _, part := range strings.Split(raw, ",") {
+			if part = strings.TrimSpace(part); part != "" {
+				out = append(out, part)
+			}
+		}
+	}
+	return out
 }
 
 // Validate validates the configuration

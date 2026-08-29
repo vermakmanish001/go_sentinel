@@ -318,6 +318,44 @@ Chart data comes from `/api/runs/{id}/series`. A run alternating `/get` and
 `/status/500` should show RPS ramping with the VU count, non-zero p95/p99, and a
 steady 50% error rate — three separate plots, never two scales on one axis.
 
+## Tier 4g — Authentication and the target allowlist
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' localhost:8090/api/runs      # 401
+curl -s -o /dev/null -w '%{http_code}\n' localhost:8090/api/health    # 200
+curl -s -o /dev/null -w '%{http_code}\n' localhost:8090/              # 200, login screen
+
+curl -s -c /tmp/jar -X POST localhost:8090/api/auth/login \
+  -H 'Content-Type: application/json' -d '{"username":"admin","password":"…"}'
+curl -s -b /tmp/jar -o /dev/null -w '%{http_code}\n' localhost:8090/api/runs   # 200
+```
+
+Expected on a passing stack:
+
+- Anonymous requests to data endpoints return **401**; `/api/health` and the
+  dashboard HTML stay reachable so the login screen can load.
+- A wrong password and an unknown username both return **401** — and take
+  comparable time, since a missing user is hashed against a dummy anyway.
+- Logout returns 204 and the next request is 401; a forged cookie is 401.
+- A completed run records `started_by` with the username that queued it.
+- With `auth_enabled` and no accounts, the server **refuses to start**.
+  `./bin/api --create-user alice` creates one; passwords under 8 characters are
+  rejected.
+
+Allowlist, with `GOSENTINEL_API_ALLOWED_TARGETS=httpbin,localhost`:
+
+| Target | Expected |
+|---|---|
+| `http://httpbin:8080` | 202 accepted |
+| `https://a.staging.example.com` (with `*.staging.example.com`) | 202 accepted |
+| `https://staging.example.com` | 403 — the wildcard is subdomains only |
+| `https://httpbin.evil.com` | 403 — suffix confusion is not a match |
+| `http://169.254.169.254` | 403 — cloud metadata, blocked even unrestricted |
+| `file:///etc/passwd` | 403 — only http and https |
+
+List settings accept comma-separated environment variables; a single unsplit
+string would become one pattern matching nothing.
+
 ## Tier 5 — Observability surfaces
 
 | Surface | URL | Expected |

@@ -5,10 +5,11 @@ import WorkersPanel from './components/WorkersPanel.jsx'
 import HistoryPanel from './components/HistoryPanel.jsx'
 import PlansPanel from './components/PlansPanel.jsx'
 import ComparePanel from './components/ComparePanel.jsx'
+import LoginScreen from './components/LoginScreen.jsx'
 import { MAX_COMPARE, SERIES } from './palette.js'
 import {
-  deletePlan, deleteRun, getSeries, getWorkers, listPlans, listRuns,
-  savePlan, startRun, stopRun, streamRun,
+  AuthError, deletePlan, deleteRun, getMe, getSeries, getWorkers, listPlans,
+  listRuns, logout, savePlan, startRun, stopRun, streamRun,
 } from './api.js'
 
 const emptyPlan = () => ({
@@ -37,6 +38,7 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [queuePos, setQueuePos] = useState(null)
   const [compare, setCompare] = useState([])   // [{run, samples}]
+  const [session, setSession] = useState({ state: 'loading' })
   const closeStream = useRef(null)
 
   // Colour follows the run, not its position in the current selection, so
@@ -51,21 +53,40 @@ export default function App() {
     return colorSlots.current.get(id)
   }
 
+  // A 401 anywhere means the session lapsed; drop straight to the login screen
+  // rather than showing a wall of failed panels.
+  const guard = useCallback((e) => {
+    if (e instanceof AuthError) { setSession({ state: 'out' }); return true }
+    return false
+  }, [])
+
   const refreshRuns = useCallback(async () => {
-    try { setRuns((await listRuns()).runs || []) } catch { /* history is best-effort */ }
-  }, [])
+    try { setRuns((await listRuns()).runs || []) } catch (e) { guard(e) }
+  }, [guard])
   const refreshPlans = useCallback(async () => {
-    try { setPlans((await listPlans()).plans || []) } catch { /* ignore */ }
-  }, [])
+    try { setPlans((await listPlans()).plans || []) } catch (e) { guard(e) }
+  }, [guard])
   const refreshWorkers = useCallback(async () => {
-    try { setWorkers(await getWorkers()) } catch { setWorkers({ workers: [], capacity: 0 }) }
+    try { setWorkers(await getWorkers()) } catch (e) {
+      if (!guard(e)) setWorkers({ workers: [], capacity: 0 })
+    }
+  }, [guard])
+
+  useEffect(() => {
+    getMe()
+      .then((me) => setSession(
+        !me.auth_required || me.username
+          ? { state: 'in', username: me.username }
+          : { state: 'out' }))
+      .catch(() => setSession({ state: 'out' }))
   }, [])
 
   useEffect(() => {
+    if (session.state !== 'in') return
     refreshWorkers(); refreshRuns(); refreshPlans()
     const t = setInterval(refreshWorkers, 3000)
     return () => clearInterval(t)
-  }, [refreshWorkers, refreshRuns, refreshPlans])
+  }, [session.state, refreshWorkers, refreshRuns, refreshPlans])
 
   useEffect(() => () => closeStream.current?.(), [])
 
@@ -97,7 +118,7 @@ export default function App() {
         },
       })
     } catch (e) {
-      setError(e.message)
+      if (!guard(e)) setError(e.message)
     } finally {
       setBusy(false)
     }
@@ -193,6 +214,11 @@ export default function App() {
     }
   }
 
+  if (session.state === 'loading') return <div className="login-wrap"><p className="hint">Loading…</p></div>
+  if (session.state === 'out') {
+    return <LoginScreen onSignedIn={(username) => setSession({ state: 'in', username })} />
+  }
+
   return (
     <div className="app">
       <header>
@@ -201,6 +227,15 @@ export default function App() {
           {workers.workers.length} worker{workers.workers.length === 1 ? '' : 's'}
           {' · '}{workers.capacity.toLocaleString()} VU capacity
         </div>
+        {session.username && (
+          <div className="account">
+            {session.username}
+            <button type="button" className="link"
+              onClick={() => logout().finally(() => setSession({ state: 'out' }))}>
+              Sign out
+            </button>
+          </div>
+        )}
       </header>
 
       {error && <div className="banner error" onClick={() => setError(null)}>{error}</div>}

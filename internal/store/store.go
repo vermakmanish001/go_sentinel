@@ -26,6 +26,7 @@ type Run struct {
 	PlanSpec      string  `json:"plan_spec,omitempty"`
 	Status        string  `json:"status"`
 	StartedAt     int64   `json:"started_at"`
+	StartedBy     string  `json:"started_by,omitempty"`
 	FinishedAt    *int64  `json:"finished_at,omitempty"`
 	DispatchedAt  *int64  `json:"dispatched_at,omitempty"`
 	Workers       int     `json:"workers"`
@@ -50,6 +51,14 @@ type Sample struct {
 	P99Ms    int64   `json:"p99_ms"`
 	Requests int64   `json:"requests"`
 	Errors   int64   `json:"errors"`
+}
+
+// User is an account that can drive the API.
+type User struct {
+	ID           int64  `json:"id"`
+	Username     string `json:"username"`
+	PasswordHash string `json:"-"`
+	CreatedAt    int64  `json:"created_at"`
 }
 
 // Plan is a reusable saved plan.
@@ -83,6 +92,16 @@ type Store interface {
 
 	AddSample(ctx context.Context, runID string, s Sample) error
 	ListSamples(ctx context.Context, runID string) ([]Sample, error)
+
+	CreateUser(ctx context.Context, username, passwordHash string) (User, error)
+	GetUserByName(ctx context.Context, username string) (User, error)
+	CountUsers(ctx context.Context) (int, error)
+
+	CreateSession(ctx context.Context, tokenHash string, userID int64, expiresAt int64) error
+	// UserForSession resolves a live session, rejecting expired ones.
+	UserForSession(ctx context.Context, tokenHash string, now int64) (User, error)
+	DeleteSession(ctx context.Context, tokenHash string) error
+	PurgeExpiredSessions(ctx context.Context, now int64) (int, error)
 
 	CreatePlan(ctx context.Context, name, spec string) (Plan, error)
 	UpdatePlan(ctx context.Context, id int64, name, spec string) (Plan, error)
@@ -140,9 +159,9 @@ func nowMs() int64 { return time.Now().UnixMilli() }
 
 func (s *sqliteStore) CreateRun(ctx context.Context, r Run) error {
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO runs (id, name, plan_spec, status, started_at, workers, peak_vus)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		r.ID, r.Name, r.PlanSpec, r.Status, r.StartedAt, r.Workers, r.PeakVUs)
+		INSERT INTO runs (id, name, plan_spec, status, started_at, started_by, workers, peak_vus)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.ID, r.Name, r.PlanSpec, r.Status, r.StartedAt, r.StartedBy, r.Workers, r.PeakVUs)
 	return err
 }
 
@@ -164,12 +183,12 @@ func (s *sqliteStore) FinishRun(ctx context.Context, id, status string, finished
 	return nil
 }
 
-const runColumns = `id, name, plan_spec, status, started_at, finished_at, dispatched_at, workers,
+const runColumns = `id, name, plan_spec, status, started_at, COALESCE(started_by, ''), finished_at, dispatched_at, workers,
 	peak_vus, total_requests, total_errors, error_pct, peak_rps, avg_rps, p95_ms, p99_ms`
 
 func scanRun(sc interface{ Scan(...any) error }) (Run, error) {
 	var r Run
-	err := sc.Scan(&r.ID, &r.Name, &r.PlanSpec, &r.Status, &r.StartedAt, &r.FinishedAt,
+	err := sc.Scan(&r.ID, &r.Name, &r.PlanSpec, &r.Status, &r.StartedAt, &r.StartedBy, &r.FinishedAt,
 		&r.DispatchedAt, &r.Workers, &r.PeakVUs, &r.TotalRequests, &r.TotalErrors, &r.ErrorPct,
 		&r.PeakRPS, &r.AvgRPS, &r.P95Ms, &r.P99Ms)
 	return r, err
@@ -307,6 +326,74 @@ func (s *sqliteStore) ListSamples(ctx context.Context, runID string) ([]Sample, 
 		out = append(out, sm)
 	}
 	return out, rows.Err()
+}
+
+// ---------- users & sessions ----------
+
+func (s *sqliteStore) CreateUser(ctx context.Context, username, passwordHash string) (User, error) {
+	ts := nowMs()
+	res, err := s.db.ExecContext(ctx,
+		`INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)`,
+		username, passwordHash, ts)
+	if err != nil {
+		return User{}, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return User{}, err
+	}
+	return User{ID: id, Username: username, PasswordHash: passwordHash, CreatedAt: ts}, nil
+}
+
+func (s *sqliteStore) GetUserByName(ctx context.Context, username string) (User, error) {
+	var u User
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, username, password_hash, created_at FROM users WHERE username = ?`, username).
+		Scan(&u.ID, &u.Username, &u.PasswordHash, &u.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return User{}, ErrNotFound
+	}
+	return u, err
+}
+
+func (s *sqliteStore) CountUsers(ctx context.Context) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`).Scan(&n)
+	return n, err
+}
+
+func (s *sqliteStore) CreateSession(ctx context.Context, tokenHash string, userID, expiresAt int64) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)`,
+		tokenHash, userID, expiresAt)
+	return err
+}
+
+func (s *sqliteStore) UserForSession(ctx context.Context, tokenHash string, now int64) (User, error) {
+	var u User
+	err := s.db.QueryRowContext(ctx, `
+		SELECT u.id, u.username, u.password_hash, u.created_at
+		FROM sessions s JOIN users u ON u.id = s.user_id
+		WHERE s.token_hash = ? AND s.expires_at > ?`, tokenHash, now).
+		Scan(&u.ID, &u.Username, &u.PasswordHash, &u.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return User{}, ErrNotFound
+	}
+	return u, err
+}
+
+func (s *sqliteStore) DeleteSession(ctx context.Context, tokenHash string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE token_hash = ?`, tokenHash)
+	return err
+}
+
+func (s *sqliteStore) PurgeExpiredSessions(ctx context.Context, now int64) (int, error) {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE expires_at <= ?`, now)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
 }
 
 // ---------- plans ----------

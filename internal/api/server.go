@@ -21,13 +21,22 @@ import (
 
 // Server serves the HTTP API and, in production, the embedded frontend.
 type Server struct {
-	orch     pborchestrator.OrchestratorServiceClient
-	parser   *runtime.Parser
-	logger   *zap.Logger
-	ui       fs.FS
-	store    store.Store
-	recorder *Recorder
-	queue    *Queue
+	orch      pborchestrator.OrchestratorServiceClient
+	parser    *runtime.Parser
+	logger    *zap.Logger
+	ui        fs.FS
+	store     store.Store
+	recorder  *Recorder
+	queue     *Queue
+	auth      AuthConfig
+	allowlist *Allowlist
+}
+
+// AuthConfig controls session authentication.
+type AuthConfig struct {
+	Enabled       bool
+	SessionTTL    time.Duration
+	SecureCookies bool
 }
 
 // uiBuilt reports whether the embedded frontend actually contains a build, as
@@ -46,9 +55,14 @@ func New(
 	parser *runtime.Parser,
 	st store.Store,
 	ui fs.FS,
+	auth AuthConfig,
+	allowlist *Allowlist,
 	logger *zap.Logger,
 ) *Server {
-	s := &Server{orch: orch, parser: parser, store: st, ui: ui, logger: logger}
+	s := &Server{
+		orch: orch, parser: parser, store: st, ui: ui,
+		auth: auth, allowlist: allowlist, logger: logger,
+	}
 	s.recorder = NewRecorder(orch, st, logger)
 	s.queue = NewQueue(st, orch, s.recorder, parser, logger)
 	return s
@@ -61,20 +75,30 @@ func (s *Server) Start(ctx context.Context) { s.queue.Start(ctx) }
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 
+	// Unauthenticated: liveness, and the two endpoints the login screen needs.
 	mux.HandleFunc("GET /api/health", s.handleHealth)
-	mux.HandleFunc("GET /api/workers", s.handleWorkers)
-	mux.HandleFunc("POST /api/runs", s.handleStartRun)
-	mux.HandleFunc("GET /api/runs", s.handleListRuns)
-	mux.HandleFunc("GET /api/runs/{id}", s.handleRunStatus)
-	mux.HandleFunc("DELETE /api/runs/{id}", s.handleDeleteRun)
-	mux.HandleFunc("GET /api/runs/{id}/series", s.handleRunSeries)
-	mux.HandleFunc("POST /api/runs/{id}/stop", s.handleStopRun)
-	mux.HandleFunc("GET /api/runs/{id}/stream", s.handleStreamRun)
+	mux.HandleFunc("GET /api/auth/me", s.handleMe)
+	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
+	mux.HandleFunc("POST /api/auth/logout", s.handleLogout)
 
-	mux.HandleFunc("GET /api/plans", s.handleListPlans)
-	mux.HandleFunc("POST /api/plans", s.handleCreatePlan)
-	mux.HandleFunc("PUT /api/plans/{id}", s.handleUpdatePlan)
-	mux.HandleFunc("DELETE /api/plans/{id}", s.handleDeletePlan)
+	// Everything that reads data or drives the fleet requires a session.
+	protected := map[string]http.HandlerFunc{
+		"GET /api/workers":          s.handleWorkers,
+		"POST /api/runs":            s.handleStartRun,
+		"GET /api/runs":             s.handleListRuns,
+		"GET /api/runs/{id}":        s.handleRunStatus,
+		"DELETE /api/runs/{id}":     s.handleDeleteRun,
+		"GET /api/runs/{id}/series": s.handleRunSeries,
+		"POST /api/runs/{id}/stop":  s.handleStopRun,
+		"GET /api/runs/{id}/stream": s.handleStreamRun,
+		"GET /api/plans":            s.handleListPlans,
+		"POST /api/plans":           s.handleCreatePlan,
+		"PUT /api/plans/{id}":       s.handleUpdatePlan,
+		"DELETE /api/plans/{id}":    s.handleDeletePlan,
+	}
+	for pattern, handler := range protected {
+		mux.HandleFunc(pattern, s.requireAuth(handler))
+	}
 
 	if uiBuilt(s.ui) {
 		mux.Handle("/", s.spaHandler())
@@ -124,6 +148,13 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Enforce the allowlist before anything is queued, so a rejected target
+	// never reaches a worker.
+	if err := s.allowlist.Check(scenario.HTTP.BaseURL); err != nil {
+		writeError(w, http.StatusForbidden, err.Error())
+		return
+	}
+
 	var peakVUs int
 	for _, st := range scenario.Stages {
 		if int(st.TargetVUs) > peakVUs {
@@ -134,12 +165,18 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 	testID := fmt.Sprintf("run-%d", time.Now().UnixMilli())
 	specJSON, _ := json.Marshal(req.YAMLTestPlan)
 
+	startedBy := ""
+	if user, ok := UserFrom(r.Context()); ok {
+		startedBy = user.Username
+	}
+
 	if err := s.store.CreateRun(r.Context(), store.Run{
 		ID:        testID,
 		Name:      scenario.Name,
 		PlanSpec:  string(specJSON),
 		Status:    StatusQueued,
 		StartedAt: time.Now().UnixMilli(),
+		StartedBy: startedBy,
 		PeakVUs:   peakVUs,
 	}); err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("could not queue run: %v", err))

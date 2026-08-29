@@ -3,12 +3,15 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -26,6 +29,9 @@ import (
 )
 
 func main() {
+	createUser := flag.String("create-user", "", "create a user and exit; the password is read from GOSENTINEL_ADMIN_PASSWORD or stdin")
+	flag.Parse()
+
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
@@ -58,11 +64,51 @@ func main() {
 	defer st.Close()
 	log.Info("history database ready", zap.String("path", cfg.API.DBPath))
 
+	if *createUser != "" {
+		if err := addUser(st, *createUser); err != nil {
+			log.Fatal("could not create user", zap.Error(err))
+		}
+		log.Info("user created", zap.String("username", *createUser))
+		return
+	}
+
+	allowlist := api.NewAllowlist(cfg.API.AllowedTargets)
+	if allowlist.Unrestricted() {
+		log.Warn("no target allowlist configured: this instance will load-test ANY host it can reach. " +
+			"Set api.allowed_targets before exposing it beyond localhost.")
+	} else {
+		log.Info("target allowlist active", zap.Strings("allowed", cfg.API.AllowedTargets))
+	}
+
+	if cfg.API.AuthEnabled {
+		created, err := api.BootstrapUser(context.Background(), st,
+			cfg.API.BootstrapUser, cfg.API.BootstrapPassword)
+		if err != nil {
+			log.Fatal("authentication is enabled but no account exists. "+
+				"Create one with --create-user, or set api.bootstrap_user and api.bootstrap_password",
+				zap.Error(err))
+		}
+		if created {
+			log.Warn("created bootstrap account from configuration; change its password",
+				zap.String("username", cfg.API.BootstrapUser))
+		}
+	} else {
+		log.Warn("authentication is DISABLED: every endpoint is open to anyone who can reach this port")
+	}
+
+	useTLS := cfg.API.TLSCert != "" && cfg.API.TLSKey != ""
+
 	srv := api.New(
 		pborchestrator.NewOrchestratorServiceClient(conn),
 		runtime.NewParser(log),
 		st,
 		ui,
+		api.AuthConfig{
+			Enabled:       cfg.API.AuthEnabled,
+			SessionTTL:    cfg.API.SessionTTL,
+			SecureCookies: useTLS,
+		},
+		allowlist,
 		log,
 	)
 
@@ -82,8 +128,17 @@ func main() {
 		log.Info("api server starting",
 			zap.String("address", addr),
 			zap.String("orchestrator", orchURL),
+			zap.Bool("tls", useTLS),
+			zap.Bool("auth", cfg.API.AuthEnabled),
 		)
-		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+
+		var err error
+		if useTLS {
+			err = httpServer.ListenAndServeTLS(cfg.API.TLSCert, cfg.API.TLSKey)
+		} else {
+			err = httpServer.ListenAndServe()
+		}
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatal("api server failed", zap.Error(err))
 		}
 	}()
@@ -98,4 +153,29 @@ func main() {
 	if err := httpServer.Shutdown(ctx); err != nil {
 		log.Warn("graceful shutdown failed", zap.Error(err))
 	}
+}
+
+// addUser creates an account from the command line. The password comes from the
+// environment when set, so it never lands in shell history, and otherwise from
+// stdin.
+func addUser(st store.Store, username string) error {
+	password := os.Getenv("GOSENTINEL_ADMIN_PASSWORD")
+	if password == "" {
+		fmt.Fprintf(os.Stderr, "Password for %q: ", username)
+		line, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		if err != nil {
+			return err
+		}
+		password = strings.TrimSpace(line)
+	}
+	if len(password) < 8 {
+		return fmt.Errorf("password must be at least 8 characters")
+	}
+
+	hash, err := api.HashPassword(password)
+	if err != nil {
+		return err
+	}
+	_, err = st.CreateUser(context.Background(), username, hash)
+	return err
 }

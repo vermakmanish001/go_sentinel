@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS runs (
     plan_spec      TEXT    NOT NULL,
     status         TEXT    NOT NULL,
     started_at     INTEGER NOT NULL,
+    started_by     TEXT,
     finished_at    INTEGER,
     dispatched_at  INTEGER,
     workers        INTEGER NOT NULL DEFAULT 0,
@@ -39,6 +40,23 @@ CREATE TABLE IF NOT EXISTS runs (
 
 CREATE INDEX IF NOT EXISTS idx_runs_started ON runs(started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_runs_status  ON runs(status, started_at);
+
+CREATE TABLE IF NOT EXISTS users (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    username      TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+    password_hash TEXT    NOT NULL,
+    created_at    INTEGER NOT NULL
+);
+
+-- Sessions store a hash of the token, never the token itself: a leaked database
+-- must not hand out usable cookies.
+CREATE TABLE IF NOT EXISTS sessions (
+    token_hash TEXT    PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at);
 
 CREATE TABLE IF NOT EXISTS samples (
     run_id   TEXT    NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
@@ -61,4 +79,5 @@ CREATE TABLE IF NOT EXISTS samples (
 // ignored by applyMigrations.
 var migrations = []string{
 	`ALTER TABLE runs ADD COLUMN dispatched_at INTEGER`,
+	`ALTER TABLE runs ADD COLUMN started_by TEXT`,
 }

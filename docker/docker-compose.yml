@@ -76,6 +76,13 @@ services:
       - GOSENTINEL_API_ORCHESTRATOR_URL=orchestrator:50051
       - GOSENTINEL_API_DB_PATH=/data/gosentinel.db
       - GOSENTINEL_LOGGING_LEVEL=info
+      # Local dev credentials. CHANGE BOTH before exposing this beyond
+      # localhost — they create the first account on an empty database.
+      - GOSENTINEL_API_BOOTSTRAP_USER=admin
+      - GOSENTINEL_API_BOOTSTRAP_PASSWORD=changeme-in-production
+      # Hosts a test may target. This local stack only needs its own httpbin.
+      # An empty list means ANY host, which is why one is set here.
+      - GOSENTINEL_API_ALLOWED_TARGETS=httpbin,localhost
     volumes:
       - api-data:/data
     ports:

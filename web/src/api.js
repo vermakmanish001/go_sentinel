@@ -1,5 +1,10 @@
+// Raised when the server rejects the session, so the app can show the login
+// screen instead of surfacing "unauthorized" as a generic error banner.
+export class AuthError extends Error {}
+
 async function request(path, options) {
   const res = await fetch(path, options)
+  if (res.status === 401) throw new AuthError('Not signed in')
   const text = await res.text()
   let body = null
   if (text) {
@@ -14,6 +19,15 @@ async function request(path, options) {
 }
 
 export const getHealth = () => request('/api/health')
+
+export const getMe = () => request('/api/auth/me')
+export const login = (username, password) =>
+  request('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  })
+export const logout = () => request('/api/auth/logout', { method: 'POST' })
 export const listRuns = (limit = 25) => request(`/api/runs?limit=${limit}`)
 export const getSeries = (id) => request(`/api/runs/${id}/series`)
 export const deleteRun = (id) => request(`/api/runs/${id}`, { method: 'DELETE' })
