@@ -26,6 +26,8 @@ type Engine struct {
 	ctx                context.Context
 	cancel             context.CancelFunc
 	activeVUs          int32
+	testActive         bool
+	testCancel         context.CancelFunc
 }
 
 // NewEngine creates a new load testing engine
@@ -53,8 +55,15 @@ func NewEngine(workerID string, maxVUs int, orchestratorClient pborchestrator.Or
 
 // RunTest runs a test plan
 func (e *Engine) RunTest(ctx context.Context, testID string, plan *models.TestPlan, assignedVUs int32) error {
+	// Per-test context: cancelling it aborts every remaining stage, not just the
+	// virtual users of the stage currently in flight.
+	testCtx, testCancel := context.WithCancel(ctx)
+	defer testCancel()
+
 	e.mu.Lock()
 	e.currentTestID = testID
+	e.testActive = true
+	e.testCancel = testCancel
 	e.mu.Unlock()
 
 	e.logger.Info("starting test",
@@ -66,15 +75,25 @@ func (e *Engine) RunTest(ctx context.Context, testID string, plan *models.TestPl
 	e.metrics.Reset()
 
 	// Start reporter
-	e.reporter.Start()
+	e.reporter.Start(testID)
 	defer e.reporter.Stop()
 
+	// Clear the active flag before the reporter's final batch goes out, so the
+	// keep-alive in cmd/worker cannot re-assert this test as still running.
+	defer func() {
+		e.mu.Lock()
+		e.testActive = false
+		e.mu.Unlock()
+	}()
+
 	// Create virtual users
-	e.virtualUsers = make([]*VirtualUser, assignedVUs)
+	vus := make([]*VirtualUser, assignedVUs)
 	for i := int32(0); i < assignedVUs; i++ {
-		vu := NewVirtualUser(int(i), &plan.HTTP, e.httpClient, e.logger, e.metrics)
-		e.virtualUsers[i] = vu
+		vus[i] = NewVirtualUser(int(i), &plan.HTTP, e.httpClient, e.logger, e.metrics)
 	}
+	e.mu.Lock()
+	e.virtualUsers = vus
+	e.mu.Unlock()
 
 	// Run stages sequentially
 	for stageIdx, stage := range plan.Stages {
@@ -84,7 +103,7 @@ func (e *Engine) RunTest(ctx context.Context, testID string, plan *models.TestPl
 			zap.Duration("duration", stage.Duration),
 		)
 
-		if err := e.runStage(ctx, stage, assignedVUs); err != nil {
+		if err := e.runStage(testCtx, stage, assignedVUs); err != nil {
 			return fmt.Errorf("stage %d failed: %w", stageIdx, err)
 		}
 	}
@@ -103,17 +122,20 @@ func (e *Engine) runStage(ctx context.Context, stage models.Stage, totalVUs int3
 		activeVUs = totalVUs
 	}
 
+	e.mu.RLock()
+	vus := e.virtualUsers
+	e.mu.RUnlock()
+	if int(activeVUs) > len(vus) {
+		activeVUs = int32(len(vus))
+	}
+
 	// Start virtual users
 	var wg sync.WaitGroup
 	stageCtx, stageCancel := context.WithTimeout(ctx, stage.Duration)
 	defer stageCancel()
 
 	for i := int32(0); i < activeVUs; i++ {
-		if i >= int32(len(e.virtualUsers)) {
-			break
-		}
-
-		vu := e.virtualUsers[i]
+		vu := vus[i]
 		wg.Add(1)
 		atomic.AddInt32(&e.activeVUs, 1)
 		promActiveVUs.Inc()
@@ -143,7 +165,7 @@ func (e *Engine) runStage(ctx context.Context, stage models.Stage, totalVUs int3
 	// stage while the rest of the fleet is still on this one.
 	<-stageCtx.Done()
 
-	for _, vu := range e.virtualUsers[:activeVUs] {
+	for _, vu := range vus[:activeVUs] {
 		vu.Stop()
 	}
 	<-done
@@ -156,22 +178,38 @@ func (e *Engine) runStage(ctx context.Context, stage models.Stage, totalVUs int3
 	return nil
 }
 
+// CurrentTest returns the test this engine last ran and whether it is still
+// running. The keep-alive reporter uses it to stamp batches correctly between
+// tests.
+func (e *Engine) CurrentTest() (string, bool) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.currentTestID, e.testActive
+}
+
 // GetActiveVUs returns the number of currently active virtual users
 func (e *Engine) GetActiveVUs() int32 {
 	return atomic.LoadInt32(&e.activeVUs)
 }
 
-// StopTest stops the current test
+// StopTest aborts the test currently in flight. The engine itself stays usable
+// for subsequent tests — only Shutdown tears it down.
 func (e *Engine) StopTest() error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
+	e.mu.RLock()
+	testID := e.currentTestID
+	cancel := e.testCancel
+	vus := e.virtualUsers
+	e.mu.RUnlock()
 
-	e.logger.Info("stopping test", zap.String("test_id", e.currentTestID))
+	e.logger.Info("stopping test", zap.String("test_id", testID))
 
-	e.cancel()
-
-	// Stop all virtual users
-	for _, vu := range e.virtualUsers {
+	// Cancelling the per-test context unwinds the stage loop; stopping the
+	// virtual users directly makes in-flight requests abort immediately rather
+	// than waiting out the current stage tick.
+	if cancel != nil {
+		cancel()
+	}
+	for _, vu := range vus {
 		vu.Stop()
 	}
 
@@ -189,8 +227,12 @@ func (e *Engine) Shutdown() error {
 
 	e.cancel()
 
+	e.mu.RLock()
+	vus := e.virtualUsers
+	e.mu.RUnlock()
+
 	// Stop all virtual users
-	for _, vu := range e.virtualUsers {
+	for _, vu := range vus {
 		vu.Stop()
 	}
 

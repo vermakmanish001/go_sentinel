@@ -7,71 +7,117 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/vermakmanish001/go_sentinel/pkg/models"
 	pbmetrics "github.com/vermakmanish001/go_sentinel/proto/metrics"
 	pborchestrator "github.com/vermakmanish001/go_sentinel/proto/orchestrator"
-	"github.com/vermakmanish001/go_sentinel/pkg/models"
 )
 
-// Reporter streams metrics to the orchestrator
+// Reporter streams metrics to the orchestrator for the duration of a test.
 type Reporter struct {
 	workerID           string
 	metrics            *MetricsCollector
 	logger             *zap.Logger
 	orchestratorClient pborchestrator.OrchestratorServiceClient
-	ctx                context.Context
-	cancel             context.CancelFunc
-	mu                 sync.RWMutex
-	lastReport         time.Time
 	reportInterval     time.Duration
+
+	// cancel stops the in-flight report loop. It is replaced on every Start and
+	// cleared by Stop so the reporter can be restarted for each test. A single
+	// long-lived context would stay cancelled after the first test finished,
+	// silently reducing every later test to the 10s keep-alive cadence.
+	mu     sync.Mutex
+	cancel context.CancelFunc
+	testID string
 }
 
 // NewReporter creates a new metrics reporter
 func NewReporter(workerID string, metrics *MetricsCollector, client pborchestrator.OrchestratorServiceClient, logger *zap.Logger) *Reporter {
-	ctx, cancel := context.WithCancel(context.Background())
-
 	return &Reporter{
 		workerID:           workerID,
 		metrics:            metrics,
 		logger:             logger,
 		orchestratorClient: client,
-		ctx:                ctx,
-		cancel:             cancel,
 		reportInterval:     1 * time.Second,
-		lastReport:         time.Now(),
 	}
 }
 
-// Start starts the reporter goroutine
-func (r *Reporter) Start() {
-	go r.reportLoop()
+// Start begins reporting metrics for testID, stopping any previous loop first.
+func (r *Reporter) Start(testID string) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	r.mu.Lock()
+	if r.cancel != nil {
+		r.cancel()
+	}
+	r.cancel = cancel
+	r.testID = testID
+	r.mu.Unlock()
+
+	go r.reportLoop(ctx)
 }
 
-// reportLoop continuously reports metrics
-func (r *Reporter) reportLoop() {
+// reportLoop continuously reports metrics until its context is cancelled.
+func (r *Reporter) reportLoop(ctx context.Context) {
 	ticker := time.NewTicker(r.reportInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case <-r.ctx.Done():
+		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if err := r.report(); err != nil {
-				r.logger.Warn("failed to report metrics", zap.Error(err))
-			}
+			r.report(true)
 		}
+	}
+}
+
+// Stop halts reporting and sends one final batch marking the test finished.
+// That final batch is how the orchestrator learns this worker is done, so it
+// is sent even though the loop has already been cancelled.
+func (r *Reporter) Stop() {
+	r.mu.Lock()
+	if r.cancel != nil {
+		r.cancel()
+		r.cancel = nil
+	}
+	r.mu.Unlock()
+
+	r.report(false)
+}
+
+// report sends a metrics batch to the orchestrator.
+func (r *Reporter) report(testActive bool) {
+	r.mu.Lock()
+	testID := r.testID
+	r.mu.Unlock()
+
+	if r.orchestratorClient == nil {
+		return
+	}
+
+	batch := NewMetricBatch(r.workerID, testID, testActive, r.metrics.GetSnapshot())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if _, err := r.orchestratorClient.ReportMetrics(ctx, batch); err != nil {
+		r.logger.Warn("failed to report metrics", zap.Error(err))
 	}
 }
 
 // NewMetricBatch converts a metrics snapshot into a batch for the orchestrator.
 //
 // Every batch sent to the orchestrator must go through here. The orchestrator's
-// aggregator replaces a worker's entry wholesale on each report, so a batch that
-// leaves RPS, latency or error rate unset drops that worker's contribution to
-// the fleet totals to zero until its next full report.
-func NewMetricBatch(workerID string, snapshot models.MetricSnapshot) *pbmetrics.MetricBatch {
+// aggregator replaces a worker's entry wholesale, so a batch that leaves RPS,
+// latency or error rate unset drops that worker's contribution to the fleet
+// totals to zero until its next full report.
+//
+// testActive must reflect whether the worker is still executing testID: the
+// orchestrator marks a test complete once every assigned worker reports false.
+func NewMetricBatch(workerID, testID string, testActive bool, snapshot models.MetricSnapshot) *pbmetrics.MetricBatch {
 	return &pbmetrics.MetricBatch{
 		WorkerId:         workerID,
+		TestId:           testID,
+		TestActive:       testActive,
 		BatchTimestampMs: time.Now().UnixMilli(),
 		RpsSnapshot: &pbmetrics.RPSSnapshot{
 			Current:       snapshot.RPS.Current,
@@ -96,23 +142,4 @@ func NewMetricBatch(workerID string, snapshot models.MetricSnapshot) *pbmetrics.
 		TotalRequests: snapshot.TotalRequests,
 		TotalErrors:   snapshot.TotalErrors,
 	}
-}
-
-// report sends a metrics batch to the orchestrator
-func (r *Reporter) report() error {
-	batch := NewMetricBatch(r.workerID, r.metrics.GetSnapshot())
-
-	if r.orchestratorClient != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_, _ = r.orchestratorClient.ReportMetrics(ctx, batch)
-	}
-
-	r.lastReport = time.Now()
-	return nil
-}
-
-// Stop stops the reporter
-func (r *Reporter) Stop() {
-	r.cancel()
 }

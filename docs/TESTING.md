@@ -6,9 +6,8 @@ HTTP load → metrics aggregation → dashboard.
 Checks are layered. Tier 0 needs only Go. Tiers 1–6 need Docker, because the
 production orchestrator hard-requires etcd — see [Why Docker is mandatory](#why-docker-is-mandatory).
 
-> **Status:** this procedure was last executed against a 3-worker stack and
-> found two unfixed defects that break multi-stage tests. See
-> [Known gaps](#known-gaps--genuinely-broken). Tiers 1–4 otherwise pass.
+> **Status:** last executed end to end against a 3-worker stack — all tiers
+> pass. Reference numbers throughout are from that run.
 
 ---
 
@@ -91,9 +90,8 @@ Expect `orchestrator` plus `docker-worker-1..3` all `up`.
 ```
 
 Expect three rows, addresses `<container-id>:50052`, Max VUs 1000 each, recent
-Last Seen. Status reads **`running`** even when idle — the 10-second keep-alive
-calls `ReportMetrics`, whose handler unconditionally marks the node running. Not
-a signal that a test is in flight.
+Last Seen, and status `idle`. Status tracks the `test_active` flag on incoming
+metric batches, so it reads `running` only while a test really is in flight.
 
 If the list is empty:
 
@@ -139,13 +137,18 @@ per-worker targets sum to the plan's stage target:
 docker-compose -f docker/docker-compose.yml logs worker | grep "starting stage"
 ```
 
-Reference values from a passing run (plan 5 → 10 → 5, three equal workers):
+Reference values from a passing run (plan 5 → 10 → 5, three equal workers).
+Throughput must scale with the VU count, not just the allocation:
 
-| Stage | w1 | w2 | w3 | Sum | Plan target |
-|---|---|---|---|---|---|
-| 0 | 2 | 1 | 2 | **5** | 5 |
-| 1 | 3 | 3 | 4 | **10** | 10 |
-| 2 | 2 | 1 | 2 | **5** | 5 |
+| Stage | w1 | w2 | w3 | Sum | Plan target | Measured RPS |
+|---|---|---|---|---|---|---|
+| 0 | 1 | 2 | 2 | **5** | 5 | 94.8 |
+| 1 | 3 | 3 | 4 | **10** | 10 | **190.1** (2.00×) |
+| 2 | 1 | 2 | 2 | **5** | 5 | 96.1 |
+
+If the allocation is right but RPS stays flat across stages, the virtual users
+are not actually running — check that they are being reused across stages
+rather than dying after the first `Stop`.
 
 If every worker reports the same number in every stage and the sum sits flat at
 the peak, per-worker stage scaling is broken.
@@ -159,9 +162,6 @@ for w in docker-worker-1 docker-worker-2 docker-worker-3; do
 done
 ```
 
-> ⚠️ **This currently does not match the table above beyond stage 0.** See
-> [Known gaps](#known-gaps--genuinely-broken).
-
 ### 4b. Aggregate metrics must not drop out
 
 Workers report every second, plus a 10-second keep-alive. Both must send a
@@ -170,7 +170,12 @@ partial batch zeroes that worker's contribution until its next full report.
 
 Watch RPS across several keep-alive ticks; it must never read 0 mid-test.
 A passing run: **86 consecutive 1-second samples under load, zero readings of
-0.00**, RPS steady at ~96.
+0.00**.
+
+Also confirm the cadence is per-second and stays that way for **repeat** runs on
+the same workers — the reporter is restarted for each test, and a regression
+there silently drops later runs to the 10s keep-alive resolution. A passing
+second run showed **120 distinct request-count values across 134 samples**.
 
 ### 4c. Error rate must be dimensionally sane
 
@@ -205,8 +210,8 @@ An error rate many times larger than RPS, growing over the run, means the rate i
 being computed from a cumulative counter divided by the aggregation interval
 instead of summed across workers.
 
-Note the first ~10 seconds of any second test show the **previous** test's stale
-aggregate — the orchestrator never clears worker entries between tests.
+Metrics are keyed by test id, so a new run starts from zero rather than
+inheriting the previous run's totals.
 
 ---
 
@@ -225,10 +230,20 @@ aggregate — the orchestrator never clears worker entries between tests.
 ## Tier 6 — Lifecycle and teardown
 
 ```bash
-./bin/cli status <test-id>
-./bin/cli stop   <test-id>
+./bin/cli status <test-id>     # RUNNING -> COMPLETED once every worker finishes
+./bin/cli stop   <test-id>     # aborts the run on every assigned worker
 make down
 ```
+
+A completed run reports `Status: COMPLETED`: workers signal completion via the
+`test_active` flag, and the orchestrator marks the run done once every assigned
+worker has reported it.
+
+`stop` fans out the `StopTest` RPC to each assigned worker and reports how many
+accepted. A passing run went from 5 active VUs to **0 within 4 seconds**, with
+status `STOPPED`. Note that `Current RPS` stays non-zero briefly afterwards —
+that is the trailing 10-second averaging window draining, not load still
+running; confirm with the VU gauges above.
 
 ---
 
@@ -251,38 +266,21 @@ make down
 
 ---
 
-## Known gaps — genuinely broken
+## Known gaps — genuinely not implemented
 
-**1. Virtual users are single-use, so stages after the first run too few VUs.**
-`NewVirtualUser` builds one `context.WithCancel` at construction; `Stop()`
-cancels it permanently; `Engine.runStage` reuses the same `VirtualUser` objects
-every stage. Every VU stopped at the end of a stage returns instantly from
-`Run` on reuse (`context canceled`), so only the indices never used by an
-earlier stage do any work.
-
-Measured on the 5 → 10 → 5 plan: fleet VUs went **5 → 5 → 0** instead of
-5 → 10 → 5, and RPS stayed flat at 96 through stage 1 rather than doubling.
-Stage allocation itself is correct — the logs show 3/3/4 — the VUs just die on
-reuse. Single-stage plans are unaffected.
-
-**2. The 1-second metrics reporter only works for a worker's first test.**
-`Reporter` has the same one-shot context: `Stop()` (deferred in
-`Engine.RunTest`) cancels `r.ctx` permanently, so `Start()` on a later test
-spawns a loop that returns immediately. From the second test onward, metrics
-arrive only via the 10-second keep-alive.
-
-Measured: first test produced 90 distinct aggregate updates over 149 seconds
-(~1/s); the second produced 5 over 49 seconds (~1/10s). Restarting the workers
-restores 1-second reporting for one more test.
-
-**3. `cli stop` reports success but load continues.** `Server.StopTest` cancels a
-func from `s.activeTests`, which is never populated, and never calls the
-workers' `StopTest` RPC. Use `make down` to actually halt a run.
-
-**4. Jaeger shows no traces.** `tracer.Setup` builds and installs a provider, but
+**1. Jaeger shows no traces.** `tracer.Setup` builds and installs a provider, but
 no span is ever started anywhere in the codebase. Tracing is scaffolding.
 
-**5. Grafana has no dashboards.** None are provisioned in the compose file.
+**2. Grafana has no dashboards.** None are provisioned in the compose file.
+
+**3. Completed runs are retained in memory.** The orchestrator keeps finished
+tests and their metrics so they stay queryable, and never evicts them. Fine for
+interactive use; a long-lived orchestrator will grow until restarted.
+
+**4. Aggregate percentiles are averaged across workers,** not merged. The
+correct approach is merging the HDR histograms, but the raw histograms are not
+shipped over the wire. Fleet p95/p99 are therefore approximate; per-worker
+values are exact.
 
 ---
 

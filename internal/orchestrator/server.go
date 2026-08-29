@@ -34,8 +34,6 @@ type Server struct {
 	metricsAggregator *MetricsAggregator
 	parser           *runtime.Parser
 	logger           *zap.Logger
-	activeTests      map[string]context.CancelFunc
-	mu               sync.RWMutex
 }
 
 // NewServer creates a new orchestrator server
@@ -52,7 +50,6 @@ func NewServer(
 		metricsAggregator: metricsAggregator,
 		parser:           parser,
 		logger:           logger,
-		activeTests:      make(map[string]context.CancelFunc),
 	}
 }
 
@@ -190,7 +187,7 @@ func (s *Server) StreamMetrics(req *pborchestrator.StreamMetricsRequest, stream 
 		case <-stream.Context().Done():
 			return nil
 		case <-ticker.C:
-			snapshot := s.metricsAggregator.GetAggregatedMetrics()
+			snapshot := s.metricsAggregator.GetAggregatedMetrics(req.TestId)
 
 			// Convert to proto
 			protoSnapshot := &pbmetrics.MetricSnapshot{
@@ -260,11 +257,12 @@ func (s *Server) GetTestStatus(ctx context.Context, req *pborchestrator.TestStat
 		return nil, status.Errorf(codes.NotFound, "test not found: %s", req.TestId)
 	}
 
-	snapshot := s.metricsAggregator.GetAggregatedMetrics()
+	snapshot := s.metricsAggregator.GetAggregatedMetrics(req.TestId)
+	testStatus, testWorkers := test.Snapshot()
 
 	// Convert status
 	var protoStatus pborchestrator.TestStatusResponse_Status
-	switch test.Status {
+	switch testStatus {
 	case models.TestStatusPending:
 		protoStatus = pborchestrator.TestStatusResponse_PENDING
 	case models.TestStatusRunning:
@@ -307,13 +305,13 @@ func (s *Server) GetTestStatus(ctx context.Context, req *pborchestrator.TestStat
 	}
 
 	var totalVUs int32
-	for _, vus := range test.Workers {
+	for _, vus := range testWorkers {
 		totalVUs += vus
 	}
 
 	return &pborchestrator.TestStatusResponse{
 		Status:         protoStatus,
-		ActiveWorkers:  int32(len(test.Workers)),
+		ActiveWorkers:  int32(len(testWorkers)),
 		TotalVus:       totalVUs,
 		CurrentMetrics: protoSnapshot,
 	}, nil
@@ -333,9 +331,25 @@ func (s *Server) ReportMetrics(ctx context.Context, batch *pbmetrics.MetricBatch
 	if batch.ErrorRate == nil {
 		batch.ErrorRate = &pbmetrics.ErrorRate{}
 	}
-	s.metricsAggregator.UpdateWorkerMetrics(batch.WorkerId, batch)
+	s.metricsAggregator.UpdateWorkerMetrics(batch.TestId, batch.WorkerId, batch)
 	s.nodeManager.UpdateLastSeen(batch.WorkerId)
-	s.nodeManager.UpdateStatus(batch.WorkerId, models.WorkerStatusRunning)
+
+	workerStatus := models.WorkerStatusIdle
+	if batch.TestActive {
+		workerStatus = models.WorkerStatusRunning
+	}
+	s.nodeManager.UpdateStatus(batch.WorkerId, workerStatus)
+
+	// A worker signals it has finished a test by reporting test_active=false.
+	// Once every assigned worker has done so, the run is complete — this is the
+	// only completion signal the orchestrator receives.
+	if batch.TestId != "" && !batch.TestActive {
+		if s.planDistributor.MarkWorkerDone(batch.TestId, batch.WorkerId) {
+			s.planDistributor.SetStatus(batch.TestId, models.TestStatusCompleted)
+			s.logger.Info("test completed", zap.String("test_id", batch.TestId))
+		}
+	}
+
 	return &pborchestrator.ReportMetricsResponse{Accepted: true}, nil
 }
 
@@ -355,23 +369,82 @@ func (s *Server) ListWorkers(ctx context.Context, req *pborchestrator.ListWorker
 	return &pborchestrator.ListWorkersResponse{Workers: workers}, nil
 }
 
-// StopTest stops a running test
+// StopTest stops a running test by telling each assigned worker to abort it.
 func (s *Server) StopTest(ctx context.Context, req *pborchestrator.StopTestRequest) (*pborchestrator.StopTestResponse, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	cancel, ok := s.activeTests[req.TestId]
-	if ok {
-		cancel()
-		delete(s.activeTests, req.TestId)
+	test, ok := s.planDistributor.GetActiveTest(req.TestId)
+	if !ok {
+		return &pborchestrator.StopTestResponse{
+			Success: false,
+			Message: fmt.Sprintf("test not found: %s", req.TestId),
+		}, nil
 	}
 
-	s.planDistributor.RemoveActiveTest(req.TestId)
+	_, workers := test.Snapshot()
 
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	stopped, failed := 0, 0
+
+	for workerID := range workers {
+		node, ok := s.nodeManager.GetNode(workerID)
+		if !ok {
+			mu.Lock()
+			failed++
+			mu.Unlock()
+			continue
+		}
+
+		wg.Add(1)
+		go func(wid, addr string) {
+			defer wg.Done()
+			if err := s.stopWorkerTest(addr, wid, req.TestId); err != nil {
+				s.logger.Error("failed to stop test on worker",
+					zap.String("worker_id", wid), zap.Error(err))
+				mu.Lock()
+				failed++
+				mu.Unlock()
+				return
+			}
+			mu.Lock()
+			stopped++
+			mu.Unlock()
+		}(workerID, dialableAddress(node.Address))
+	}
+	wg.Wait()
+
+	s.planDistributor.SetStatus(req.TestId, models.TestStatusStopped)
+
+	if failed > 0 {
+		return &pborchestrator.StopTestResponse{
+			Success: false,
+			Message: fmt.Sprintf("stopped on %d/%d workers", stopped, len(workers)),
+		}, nil
+	}
 	return &pborchestrator.StopTestResponse{
 		Success: true,
-		Message: "test stopped",
+		Message: fmt.Sprintf("stopped on %d workers", stopped),
 	}, nil
+}
+
+// stopWorkerTest issues the StopTest RPC to a single worker.
+func (s *Server) stopWorkerTest(addr, workerID, testID string) error {
+	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("dial %s: %w", addr, err)
+	}
+	defer conn.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := pbworker.NewWorkerServiceClient(conn).StopTest(ctx, &pbworker.StopRequest{TestId: testID})
+	if err != nil {
+		return err
+	}
+	if !resp.Success {
+		return fmt.Errorf("worker %s refused: %s", workerID, resp.Message)
+	}
+	return nil
 }
 
 // convertPlan converts a proto plan to a models plan

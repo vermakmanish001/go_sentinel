@@ -433,6 +433,8 @@ type MetricBatch struct {
 	BatchTimestampMs int64                  `protobuf:"varint,6,opt,name=batch_timestamp_ms,json=batchTimestampMs,proto3" json:"batch_timestamp_ms,omitempty"`
 	TotalRequests    int64                  `protobuf:"varint,7,opt,name=total_requests,json=totalRequests,proto3" json:"total_requests,omitempty"`
 	TotalErrors      int64                  `protobuf:"varint,8,opt,name=total_errors,json=totalErrors,proto3" json:"total_errors,omitempty"`
+	TestId           string                 `protobuf:"bytes,9,opt,name=test_id,json=testId,proto3" json:"test_id,omitempty"`               // the test these metrics belong to
+	TestActive       bool                   `protobuf:"varint,10,opt,name=test_active,json=testActive,proto3" json:"test_active,omitempty"` // false once the worker has finished the test
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -523,6 +525,20 @@ func (x *MetricBatch) GetTotalErrors() int64 {
 	return 0
 }
 
+func (x *MetricBatch) GetTestId() string {
+	if x != nil {
+		return x.TestId
+	}
+	return ""
+}
+
+func (x *MetricBatch) GetTestActive() bool {
+	if x != nil {
+		return x.TestActive
+	}
+	return false
+}
+
 var File_proto_metrics_metrics_proto protoreflect.FileDescriptor
 
 const file_proto_metrics_metrics_proto_rawDesc = "" +
@@ -568,7 +584,7 @@ const file_proto_metrics_metrics_proto_rawDesc = "" +
 	"\x06labels\x18\x04 \x03(\v2 .metrics.MetricPoint.LabelsEntryR\x06labels\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x84\x03\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xbe\x03\n" +
 	"\vMetricBatch\x12\x1b\n" +
 	"\tworker_id\x18\x01 \x01(\tR\bworkerId\x12,\n" +
 	"\x06points\x18\x02 \x03(\v2\x14.metrics.MetricPointR\x06points\x12F\n" +
@@ -578,7 +594,11 @@ const file_proto_metrics_metrics_proto_rawDesc = "" +
 	"error_rate\x18\x05 \x01(\v2\x12.metrics.ErrorRateR\terrorRate\x12,\n" +
 	"\x12batch_timestamp_ms\x18\x06 \x01(\x03R\x10batchTimestampMs\x12%\n" +
 	"\x0etotal_requests\x18\a \x01(\x03R\rtotalRequests\x12!\n" +
-	"\ftotal_errors\x18\b \x01(\x03R\vtotalErrorsB6Z4github.com/vermakmanish001/go_sentinel/proto/metricsb\x06proto3"
+	"\ftotal_errors\x18\b \x01(\x03R\vtotalErrors\x12\x17\n" +
+	"\atest_id\x18\t \x01(\tR\x06testId\x12\x1f\n" +
+	"\vtest_active\x18\n" +
+	" \x01(\bR\n" +
+	"testActiveB6Z4github.com/vermakmanish001/go_sentinel/proto/metricsb\x06proto3"
 
 var (
 	file_proto_metrics_metrics_proto_rawDescOnce sync.Once

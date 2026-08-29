@@ -6,45 +6,56 @@ import (
 
 	"go.uber.org/zap"
 
-	pbmetrics "github.com/vermakmanish001/go_sentinel/proto/metrics"
 	"github.com/vermakmanish001/go_sentinel/pkg/models"
+	pbmetrics "github.com/vermakmanish001/go_sentinel/proto/metrics"
 )
 
-// MetricsAggregator aggregates metrics from all workers
+// MetricsAggregator aggregates metrics from all workers, keyed by test.
+//
+// Metrics are scoped per test rather than kept as one global rollup: without
+// that, a new run inherits the previous run's totals until every worker has
+// reported, and concurrent or back-to-back runs blend into each other.
 type MetricsAggregator struct {
-	logger      *zap.Logger
-	workerMetrics map[string]*WorkerMetrics
-	mu          sync.RWMutex
-	aggregated  models.MetricSnapshot
+	logger *zap.Logger
+
+	mu sync.RWMutex
+	// workerMetrics maps testID -> workerID -> that worker's latest snapshot.
+	workerMetrics map[string]map[string]*WorkerMetrics
+	// aggregated caches the fleet rollup per testID.
+	aggregated map[string]models.MetricSnapshot
 }
 
 // WorkerMetrics stores metrics from a single worker
 type WorkerMetrics struct {
 	Snapshot   models.MetricSnapshot
 	LastUpdate time.Time
-	mu         sync.RWMutex
 }
 
 // NewMetricsAggregator creates a new metrics aggregator
 func NewMetricsAggregator(logger *zap.Logger) *MetricsAggregator {
 	return &MetricsAggregator{
 		logger:        logger,
-		workerMetrics: make(map[string]*WorkerMetrics),
-		aggregated:    models.MetricSnapshot{},
+		workerMetrics: make(map[string]map[string]*WorkerMetrics),
+		aggregated:    make(map[string]models.MetricSnapshot),
 	}
 }
 
-// UpdateWorkerMetrics updates metrics from a worker
-func (ma *MetricsAggregator) UpdateWorkerMetrics(workerID string, batch *pbmetrics.MetricBatch) {
+// UpdateWorkerMetrics records a worker's latest batch for a test.
+func (ma *MetricsAggregator) UpdateWorkerMetrics(testID, workerID string, batch *pbmetrics.MetricBatch) {
+	if testID == "" {
+		// A worker that has never run a test still sends keep-alives; there is
+		// no run to attribute them to.
+		return
+	}
+
 	ma.mu.Lock()
 	defer ma.mu.Unlock()
 
-	// Convert proto to models
 	snapshot := models.MetricSnapshot{
 		RPS: models.RPSSnapshot{
-			Current:      batch.RpsSnapshot.Current,
-			Average:      batch.RpsSnapshot.Average,
-			Peak:         batch.RpsSnapshot.Peak,
+			Current:       batch.RpsSnapshot.Current,
+			Average:       batch.RpsSnapshot.Average,
+			Peak:          batch.RpsSnapshot.Peak,
 			WindowSeconds: batch.RpsSnapshot.WindowSeconds,
 		},
 		Latency: models.LatencyHistogram{
@@ -67,18 +78,21 @@ func (ma *MetricsAggregator) UpdateWorkerMetrics(workerID string, batch *pbmetri
 		WorkerID:      workerID,
 	}
 
-	ma.workerMetrics[workerID] = &WorkerMetrics{
+	if ma.workerMetrics[testID] == nil {
+		ma.workerMetrics[testID] = make(map[string]*WorkerMetrics)
+	}
+	ma.workerMetrics[testID][workerID] = &WorkerMetrics{
 		Snapshot:   snapshot,
 		LastUpdate: time.Now(),
 	}
 
-	// Recalculate aggregated metrics
-	ma.recalculate()
+	ma.recalculate(testID)
 }
 
-// recalculate recalculates aggregated metrics from all workers
-func (ma *MetricsAggregator) recalculate() {
-	if len(ma.workerMetrics) == 0 {
+// recalculate recalculates the rollup for one test. Caller must hold ma.mu.
+func (ma *MetricsAggregator) recalculate(testID string) {
+	workers := ma.workerMetrics[testID]
+	if len(workers) == 0 {
 		return
 	}
 
@@ -87,8 +101,7 @@ func (ma *MetricsAggregator) recalculate() {
 	var minLatency, maxLatency, totalLatency time.Duration
 	var latencyCount int64
 
-	// Aggregate RPS and requests
-	for _, wm := range ma.workerMetrics {
+	for _, wm := range workers {
 		totalRPS += wm.Snapshot.RPS.Current
 		totalAvgRPS += wm.Snapshot.RPS.Average
 		if wm.Snapshot.RPS.Peak > peakRPS {
@@ -99,8 +112,8 @@ func (ma *MetricsAggregator) recalculate() {
 		totalErrorRate += wm.Snapshot.ErrorRate.Rate
 	}
 
-	// Aggregate latency (weighted average)
-	for _, wm := range ma.workerMetrics {
+	// Aggregate latency (count-weighted mean, true min/max)
+	for _, wm := range workers {
 		if wm.Snapshot.Latency.Count > 0 {
 			if minLatency == 0 || wm.Snapshot.Latency.Min < minLatency {
 				minLatency = wm.Snapshot.Latency.Min
@@ -118,46 +131,44 @@ func (ma *MetricsAggregator) recalculate() {
 		meanLatency = totalLatency / time.Duration(latencyCount)
 	}
 
-	// Calculate percentiles (simplified - in production, merge histograms)
+	// Percentiles are averaged across workers, which is statistically wrong —
+	// merging the HDR histograms would be correct, but the raw histograms are
+	// not shipped over the wire.
 	var p50, p95, p99, p999 time.Duration
-	if len(ma.workerMetrics) > 0 {
-		// Use average of worker percentiles (not ideal, but simple)
-		var totalP50, totalP95, totalP99, totalP999 time.Duration
-		count := 0
-		for _, wm := range ma.workerMetrics {
-			if wm.Snapshot.Latency.Count > 0 {
-				totalP50 += wm.Snapshot.Latency.P50
-				totalP95 += wm.Snapshot.Latency.P95
-				totalP99 += wm.Snapshot.Latency.P99
-				totalP999 += wm.Snapshot.Latency.P999
-				count++
-			}
-		}
-		if count > 0 {
-			p50 = totalP50 / time.Duration(count)
-			p95 = totalP95 / time.Duration(count)
-			p99 = totalP99 / time.Duration(count)
-			p999 = totalP999 / time.Duration(count)
+	var totalP50, totalP95, totalP99, totalP999 time.Duration
+	count := 0
+	for _, wm := range workers {
+		if wm.Snapshot.Latency.Count > 0 {
+			totalP50 += wm.Snapshot.Latency.P50
+			totalP95 += wm.Snapshot.Latency.P95
+			totalP99 += wm.Snapshot.Latency.P99
+			totalP999 += wm.Snapshot.Latency.P999
+			count++
 		}
 	}
+	if count > 0 {
+		p50 = totalP50 / time.Duration(count)
+		p95 = totalP95 / time.Duration(count)
+		p99 = totalP99 / time.Duration(count)
+		p999 = totalP999 / time.Duration(count)
+	}
 
-	// Calculate error rate. Each worker already reports errors-per-second over
-	// its own test duration, so the fleet rate is the sum of the worker rates —
-	// the same way RPS is combined above. Dividing the cumulative error count by
-	// the time since the last aggregation would instead report every error the
-	// test has ever seen as if it happened in the last second.
-	errorRate := totalErrorRate
+	// Each worker already reports errors-per-second over its own test duration,
+	// so the fleet rate is the sum of the worker rates — the same way RPS is
+	// combined above. Dividing the cumulative error count by the time since the
+	// last aggregation would report every error the test has ever seen as if it
+	// happened in the last second.
 	errorPercentage := float64(0)
 	if totalRequests > 0 {
 		errorPercentage = (float64(totalErrors) / float64(totalRequests)) * 100
 	}
 
-	ma.aggregated = models.MetricSnapshot{
+	ma.aggregated[testID] = models.MetricSnapshot{
 		RPS: models.RPSSnapshot{
-			Current:      totalRPS,
-			Average:      totalAvgRPS,
-			Peak:         peakRPS,
-			WindowSeconds: 10, // TODO: Get from config
+			Current:       totalRPS,
+			Average:       totalAvgRPS,
+			Peak:          peakRPS,
+			WindowSeconds: 10,
 		},
 		Latency: models.LatencyHistogram{
 			Min:   minLatency,
@@ -170,7 +181,7 @@ func (ma *MetricsAggregator) recalculate() {
 			Count: latencyCount,
 		},
 		ErrorRate: models.ErrorRate{
-			Rate:       errorRate,
+			Rate:       totalErrorRate,
 			Percentage: errorPercentage,
 		},
 		TotalRequests: totalRequests,
@@ -179,30 +190,29 @@ func (ma *MetricsAggregator) recalculate() {
 	}
 }
 
-// GetAggregatedMetrics returns the aggregated metrics snapshot
-func (ma *MetricsAggregator) GetAggregatedMetrics() models.MetricSnapshot {
+// GetAggregatedMetrics returns the rollup for one test.
+func (ma *MetricsAggregator) GetAggregatedMetrics(testID string) models.MetricSnapshot {
 	ma.mu.RLock()
 	defer ma.mu.RUnlock()
-	return ma.aggregated
+	return ma.aggregated[testID]
 }
 
-// GetWorkerMetrics returns metrics for a specific worker
-func (ma *MetricsAggregator) GetWorkerMetrics(workerID string) (models.MetricSnapshot, bool) {
+// GetWorkerMetrics returns metrics for a specific worker on a specific test.
+func (ma *MetricsAggregator) GetWorkerMetrics(testID, workerID string) (models.MetricSnapshot, bool) {
 	ma.mu.RLock()
 	defer ma.mu.RUnlock()
 
-	wm, ok := ma.workerMetrics[workerID]
+	wm, ok := ma.workerMetrics[testID][workerID]
 	if !ok {
 		return models.MetricSnapshot{}, false
 	}
-
 	return wm.Snapshot, true
 }
 
-// RemoveWorker removes metrics for a worker
-func (ma *MetricsAggregator) RemoveWorker(workerID string) {
+// RemoveTest drops all metrics held for a test.
+func (ma *MetricsAggregator) RemoveTest(testID string) {
 	ma.mu.Lock()
 	defer ma.mu.Unlock()
-	delete(ma.workerMetrics, workerID)
-	ma.recalculate()
+	delete(ma.workerMetrics, testID)
+	delete(ma.aggregated, testID)
 }

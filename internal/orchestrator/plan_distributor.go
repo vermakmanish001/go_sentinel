@@ -21,11 +21,25 @@ type PlanDistributor struct {
 
 // ActiveTest represents an active test
 type ActiveTest struct {
-	TestID      string
-	Plan        *models.TestPlan
-	Workers     map[string]int32 // worker_id -> assigned VUs
-	Status      models.TestStatus
-	mu          sync.RWMutex
+	TestID  string
+	Plan    *models.TestPlan
+	Workers map[string]int32 // worker_id -> assigned VUs
+	Status  models.TestStatus
+	// done records which workers have reported that they finished the test.
+	done map[string]bool
+	mu   sync.RWMutex
+}
+
+// Snapshot returns a consistent copy of the test's mutable state.
+func (at *ActiveTest) Snapshot() (models.TestStatus, map[string]int32) {
+	at.mu.RLock()
+	defer at.mu.RUnlock()
+
+	workers := make(map[string]int32, len(at.Workers))
+	for id, vus := range at.Workers {
+		workers[id] = vus
+	}
+	return at.Status, workers
 }
 
 // NewPlanDistributor creates a new plan distributor
@@ -79,7 +93,7 @@ func (pd *PlanDistributor) DistributePlan(ctx context.Context, testID string, pl
 		// Calculate proportional share
 		share := (float64(node.MaxVUs) / float64(totalCapacity)) * float64(totalVUs)
 		assigned := int32(share)
-		
+
 		// Ensure we don't exceed node capacity or remaining VUs
 		if assigned > node.MaxVUs {
 			assigned = node.MaxVUs
@@ -119,6 +133,7 @@ func (pd *PlanDistributor) DistributePlan(ctx context.Context, testID string, pl
 		Plan:    plan,
 		Workers: distribution,
 		Status:  models.TestStatusRunning,
+		done:    make(map[string]bool),
 	}
 
 	pd.logger.Info("plan distributed",
@@ -193,6 +208,54 @@ func (pd *PlanDistributor) GetActiveTest(testID string) (*ActiveTest, bool) {
 	defer pd.mu.RUnlock()
 	test, ok := pd.activeTests[testID]
 	return test, ok
+}
+
+// SetStatus records a terminal status for a test. The test is kept rather than
+// deleted so its final state and metrics remain queryable.
+func (pd *PlanDistributor) SetStatus(testID string, status models.TestStatus) {
+	pd.mu.RLock()
+	test, ok := pd.activeTests[testID]
+	pd.mu.RUnlock()
+	if !ok {
+		return
+	}
+
+	test.mu.Lock()
+	test.Status = status
+	test.mu.Unlock()
+
+	pd.logger.Info("test status changed",
+		zap.String("test_id", testID),
+		zap.String("status", string(status)),
+	)
+}
+
+// MarkWorkerDone records that a worker finished a test and reports whether
+// every assigned worker has now finished. Workers signal completion through the
+// test_active flag on their metric batches, so this is idempotent.
+func (pd *PlanDistributor) MarkWorkerDone(testID, workerID string) bool {
+	pd.mu.RLock()
+	test, ok := pd.activeTests[testID]
+	pd.mu.RUnlock()
+	if !ok {
+		return false
+	}
+
+	test.mu.Lock()
+	defer test.mu.Unlock()
+
+	if _, assigned := test.Workers[workerID]; !assigned {
+		return false
+	}
+	if test.done == nil {
+		test.done = make(map[string]bool)
+	}
+	test.done[workerID] = true
+
+	if test.Status != models.TestStatusRunning {
+		return false // already terminal; don't re-fire completion
+	}
+	return len(test.done) >= len(test.Workers)
 }
 
 // RemoveActiveTest removes an active test

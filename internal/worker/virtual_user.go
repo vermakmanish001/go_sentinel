@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -21,27 +22,38 @@ type VirtualUser struct {
 	client   *HTTPClient
 	logger   *zap.Logger
 	metrics  *MetricsCollector
-	ctx      context.Context
-	cancel   context.CancelFunc
+
+	// cancel aborts the in-flight Run. It is replaced on every Run and cleared
+	// when Run returns, so a virtual user can be reused across stages — a
+	// single long-lived context would stay cancelled after the first Stop.
+	mu     sync.Mutex
+	cancel context.CancelFunc
 }
 
 // NewVirtualUser creates a new virtual user
 func NewVirtualUser(id int, scenario *models.HTTPConfig, client *HTTPClient, logger *zap.Logger, metrics *MetricsCollector) *VirtualUser {
-	ctx, cancel := context.WithCancel(context.Background())
-
 	return &VirtualUser{
 		id:       id,
 		scenario: scenario,
 		client:   client,
 		logger:   logger.With(zap.Int("vu_id", id)),
 		metrics:  metrics,
-		ctx:      ctx,
-		cancel:   cancel,
 	}
 }
 
 // Run runs the virtual user lifecycle
 func (vu *VirtualUser) Run(ctx context.Context, duration time.Duration, rampUp time.Duration) error {
+	ctx, cancel := context.WithCancel(ctx)
+	vu.mu.Lock()
+	vu.cancel = cancel
+	vu.mu.Unlock()
+	defer func() {
+		cancel()
+		vu.mu.Lock()
+		vu.cancel = nil
+		vu.mu.Unlock()
+	}()
+
 	// Ramp up logic
 	if rampUp > 0 {
 		vu.logger.Debug("ramping up", zap.Duration("ramp_up", rampUp))
@@ -62,8 +74,6 @@ func (vu *VirtualUser) Run(ctx context.Context, duration time.Duration, rampUp t
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-vu.ctx.Done():
-			return vu.ctx.Err()
 		default:
 			if time.Now().After(deadline) {
 				vu.logger.Debug("virtual user completed")
@@ -194,7 +204,12 @@ func (vu *VirtualUser) checkAssertion(assertion models.Assertion, resp *http.Res
 	}
 }
 
-// Stop stops the virtual user
+// Stop aborts the virtual user's current Run, if one is in flight. It is safe
+// to call when idle, and the virtual user remains usable for later stages.
 func (vu *VirtualUser) Stop() {
-	vu.cancel()
+	vu.mu.Lock()
+	defer vu.mu.Unlock()
+	if vu.cancel != nil {
+		vu.cancel()
+	}
 }

@@ -61,4 +61,6 @@ message MetricBatch {
   int64 batch_timestamp_ms = 6;
   int64 total_requests = 7;
   int64 total_errors = 8;
+  string test_id = 9;      // the test these metrics belong to
+  bool test_active = 10;   // false once the worker has finished the test
 }
