@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite" // pure-Go driver: the images build with CGO_ENABLED=0
@@ -26,6 +27,7 @@ type Run struct {
 	Status        string  `json:"status"`
 	StartedAt     int64   `json:"started_at"`
 	FinishedAt    *int64  `json:"finished_at,omitempty"`
+	DispatchedAt  *int64  `json:"dispatched_at,omitempty"`
 	Workers       int     `json:"workers"`
 	PeakVUs       int     `json:"peak_vus"`
 	TotalRequests int64   `json:"total_requests"`
@@ -63,6 +65,17 @@ type Plan struct {
 // SQLite for Postgres later is a constructor change, not a rewrite.
 type Store interface {
 	CreateRun(ctx context.Context, r Run) error
+	// NextQueued returns the oldest run awaiting dispatch.
+	NextQueued(ctx context.Context) (Run, error)
+	// MarkDispatched moves a queued run into execution.
+	MarkDispatched(ctx context.Context, id string, workers int, at int64) error
+	// SetRunStatus records a status change that carries no summary, such as a
+	// cancellation or an interrupted run found at startup.
+	SetRunStatus(ctx context.Context, id, status string) error
+	// CountQueuedBefore reports how many runs sit ahead of this one.
+	CountQueuedBefore(ctx context.Context, id string) (int, error)
+	// FailInterruptedRuns marks runs left RUNNING by a crashed server.
+	FailInterruptedRuns(ctx context.Context) (int, error)
 	FinishRun(ctx context.Context, id, status string, finishedAt int64, summary Run) error
 	GetRun(ctx context.Context, id string) (Run, error)
 	ListRuns(ctx context.Context, limit, offset int) ([]Run, error)
@@ -98,7 +111,25 @@ func Open(path string) (Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("apply schema: %w", err)
 	}
+	if err := applyMigrations(db); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return &sqliteStore{db: db}, nil
+}
+
+// applyMigrations upgrades an existing database in place. Errors reporting a
+// column that already exists mean the migration was applied previously.
+func applyMigrations(db *sql.DB) error {
+	for _, stmt := range migrations {
+		if _, err := db.Exec(stmt); err != nil {
+			if strings.Contains(err.Error(), "duplicate column name") {
+				continue
+			}
+			return fmt.Errorf("migration %q: %w", stmt, err)
+		}
+	}
+	return nil
 }
 
 func (s *sqliteStore) Close() error { return s.db.Close() }
@@ -133,13 +164,13 @@ func (s *sqliteStore) FinishRun(ctx context.Context, id, status string, finished
 	return nil
 }
 
-const runColumns = `id, name, plan_spec, status, started_at, finished_at, workers,
+const runColumns = `id, name, plan_spec, status, started_at, finished_at, dispatched_at, workers,
 	peak_vus, total_requests, total_errors, error_pct, peak_rps, avg_rps, p95_ms, p99_ms`
 
 func scanRun(sc interface{ Scan(...any) error }) (Run, error) {
 	var r Run
 	err := sc.Scan(&r.ID, &r.Name, &r.PlanSpec, &r.Status, &r.StartedAt, &r.FinishedAt,
-		&r.Workers, &r.PeakVUs, &r.TotalRequests, &r.TotalErrors, &r.ErrorPct,
+		&r.DispatchedAt, &r.Workers, &r.PeakVUs, &r.TotalRequests, &r.TotalErrors, &r.ErrorPct,
 		&r.PeakRPS, &r.AvgRPS, &r.P95Ms, &r.P99Ms)
 	return r, err
 }
@@ -186,6 +217,59 @@ func (s *sqliteStore) DeleteRun(ctx context.Context, id string) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+func (s *sqliteStore) NextQueued(ctx context.Context) (Run, error) {
+	row := s.db.QueryRowContext(ctx,
+		`SELECT `+runColumns+` FROM runs WHERE status = 'QUEUED' ORDER BY started_at LIMIT 1`)
+	r, err := scanRun(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Run{}, ErrNotFound
+	}
+	return r, err
+}
+
+func (s *sqliteStore) MarkDispatched(ctx context.Context, id string, workers int, at int64) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE runs SET status = 'RUNNING', dispatched_at = ?, workers = ? WHERE id = ? AND status = 'QUEUED'`,
+		at, workers, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *sqliteStore) SetRunStatus(ctx context.Context, id, status string) error {
+	res, err := s.db.ExecContext(ctx, `UPDATE runs SET status = ? WHERE id = ?`, status, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *sqliteStore) CountQueuedBefore(ctx context.Context, id string) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM runs
+		WHERE status = 'QUEUED'
+		  AND started_at < (SELECT started_at FROM runs WHERE id = ?)`, id).Scan(&n)
+	return n, err
+}
+
+func (s *sqliteStore) FailInterruptedRuns(ctx context.Context) (int, error) {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE runs SET status = 'FAILED', finished_at = ? WHERE status = 'RUNNING'`, nowMs())
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
 }
 
 // ---------- samples ----------

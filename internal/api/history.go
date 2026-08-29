@@ -26,10 +26,7 @@ func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDeleteRun(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
-	s.mu.Lock()
-	active := s.activeRunID == id
-	s.mu.Unlock()
-	if active {
+	if s.queue.Current() == id {
 		writeError(w, http.StatusConflict, "run is still in flight; stop it first")
 		return
 	}

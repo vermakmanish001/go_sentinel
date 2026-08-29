@@ -66,6 +66,10 @@ func main() {
 		log,
 	)
 
+	queueCtx, stopQueue := context.WithCancel(context.Background())
+	defer stopQueue()
+	srv.Start(queueCtx)
+
 	addr := fmt.Sprintf("%s:%d", cfg.API.Address, cfg.API.Port)
 	httpServer := &http.Server{
 		Addr:    addr,

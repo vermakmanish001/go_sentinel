@@ -4,6 +4,8 @@ import MetricsPanel from './components/MetricsPanel.jsx'
 import WorkersPanel from './components/WorkersPanel.jsx'
 import HistoryPanel from './components/HistoryPanel.jsx'
 import PlansPanel from './components/PlansPanel.jsx'
+import ComparePanel from './components/ComparePanel.jsx'
+import { MAX_COMPARE, SERIES } from './palette.js'
 import {
   deletePlan, deleteRun, getSeries, getWorkers, listPlans, listRuns,
   savePlan, startRun, stopRun, streamRun,
@@ -33,7 +35,21 @@ export default function App() {
   const [workers, setWorkers] = useState({ workers: [], capacity: 0 })
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [queuePos, setQueuePos] = useState(null)
+  const [compare, setCompare] = useState([])   // [{run, samples}]
   const closeStream = useRef(null)
+
+  // Colour follows the run, not its position in the current selection, so
+  // removing one run never repaints the others.
+  const colorSlots = useRef(new Map())
+  const colorFor = (id) => {
+    if (!colorSlots.current.has(id)) {
+      const taken = new Set(colorSlots.current.values())
+      const free = SERIES.find((c) => !taken.has(c)) ?? SERIES[0]
+      colorSlots.current.set(id, free)
+    }
+    return colorSlots.current.get(id)
+  }
 
   const refreshRuns = useCallback(async () => {
     try { setRuns((await listRuns()).runs || []) } catch { /* history is best-effort */ }
@@ -53,24 +69,30 @@ export default function App() {
 
   useEffect(() => () => closeStream.current?.(), [])
 
-  const running = run && !['COMPLETED', 'STOPPED', 'FAILED'].includes(run.status)
+  const running = run && !['COMPLETED', 'STOPPED', 'FAILED', 'CANCELLED'].includes(run.status)
 
   async function handleStart() {
     setError(null); setBusy(true)
     setMetrics(null); setHistory([]); setViewing(null)
 
     try {
-      const { test_id } = await startRun(toApiPlan(plan))
-      setRun({ id: test_id, status: 'RUNNING' })
+      const { test_id, status, position } = await startRun(toApiPlan(plan))
+      setRun({ id: test_id, status: status || 'QUEUED' })
+      setQueuePos(position ?? 0)
+      refreshRuns()
 
       closeStream.current = streamRun(test_id, {
         onMetrics: (m) => {
           setMetrics(m)
           setHistory((h) => [...h.slice(-299), m])
         },
-        onStatus: (s) => setRun((r) => (r ? { ...r, status: s.status } : r)),
+        onStatus: (s) => {
+          setRun((r) => (r ? { ...r, status: s.status } : r))
+          setQueuePos(s.status === 'QUEUED' ? s.position ?? 0 : null)
+        },
         onEnd: (e) => {
           setRun((r) => (r ? { ...r, status: e.status || 'COMPLETED' } : r))
+          setQueuePos(null)
           refreshRuns()
         },
       })
@@ -95,7 +117,11 @@ export default function App() {
       const { samples } = await getSeries(r.id)
       setViewing(r)
       setRun(null)
-      setHistory((samples || []).map((s) => ({ rps: { current: s.rps } })))
+      setHistory((samples || []).map((s) => ({
+        rps: { current: s.rps },
+        latency: { p50_ms: s.p50_ms, p95_ms: s.p95_ms, p99_ms: s.p99_ms },
+        errors: { percentage: s.err_pct, rate: s.err_rate },
+      })))
       const last = samples?.[samples.length - 1]
       setMetrics({
         timestamp_ms: last?.ts_ms ?? r.started_at,
@@ -113,10 +139,34 @@ export default function App() {
     }
   }
 
+  // Toggle a finished run into the comparison set, fetching its stored series.
+  async function handleToggleCompare(r) {
+    if (compare.some((c) => c.run.id === r.id)) {
+      setCompare((c) => c.filter((x) => x.run.id !== r.id))
+      return
+    }
+    if (compare.length >= MAX_COMPARE) {
+      setError(`Comparison is limited to ${MAX_COMPARE} runs`)
+      return
+    }
+    try {
+      const { samples } = await getSeries(r.id)
+      if (!samples?.length) { setError('That run has no recorded samples'); return }
+      colorFor(r.id)
+      setCompare((c) => [...c, { run: r, samples }])
+    } catch (e) { setError(e.message) }
+  }
+
+  function clearCompare() {
+    colorSlots.current.clear()
+    setCompare([])
+  }
+
   async function handleDeleteRun(r) {
     try {
       await deleteRun(r.id)
       if (viewing?.id === r.id) { setViewing(null); setMetrics(null); setHistory([]) }
+      setCompare((c) => c.filter((x) => x.run.id !== r.id))
       refreshRuns()
     } catch (e) { setError(e.message) }
   }
@@ -157,13 +207,21 @@ export default function App() {
 
       <div className="columns">
         <section className="col">
-          <PlanForm plan={plan} onChange={setPlan} disabled={!!running} />
+          <PlanForm plan={plan} onChange={setPlan} disabled={false} />
           <div className="actions">
-            <button className="primary" onClick={handleStart} disabled={busy || running}>
-              {running ? 'Running…' : 'Run test'}
+            <button className="primary" onClick={handleStart} disabled={busy}>
+              {run?.status === 'QUEUED' ? 'Queued…' : running ? 'Running…' : 'Run test'}
             </button>
-            <button onClick={handleStop} disabled={!running || busy}>Stop</button>
-            {run && <span className={`status ${run.status.toLowerCase()}`}>{run.id} · {run.status}</span>}
+            <button onClick={handleStop} disabled={!running || busy}>
+              {run?.status === 'QUEUED' ? 'Cancel' : 'Stop'}
+            </button>
+            {run && (
+              <span className={`status ${run.status.toLowerCase()}`}>
+                {run.id} · {run.status}
+                {run.status === 'QUEUED' && queuePos != null &&
+                  (queuePos === 0 ? ' · next up' : ` · ${queuePos} ahead`)}
+              </span>
+            )}
             {viewing && <span className="status">viewing {viewing.name || viewing.id}</span>}
           </div>
           <PlansPanel plans={plans} disabled={!!running}
@@ -173,8 +231,12 @@ export default function App() {
         </section>
 
         <section className="col">
-          <MetricsPanel metrics={metrics} history={history} />
-          <HistoryPanel runs={runs} activeId={viewing?.id} onSelect={handleSelectRun}
+          <MetricsPanel metrics={metrics} history={history}
+            title={viewing ? `Run · ${viewing.name || viewing.id}` : 'Live metrics'} />
+          <ComparePanel runs={compare} colorFor={colorFor} onClear={clearCompare} />
+          <HistoryPanel runs={runs} activeId={viewing?.id}
+            selected={compare.map((c) => c.run.id)} colorFor={colorFor}
+            onSelect={handleSelectRun} onToggleCompare={handleToggleCompare}
             onDelete={handleDeleteRun}
             onReplay={(r) => r.plan_spec ? loadSpec(r.plan_spec, r.name)
                                          : setError('This run has no stored plan')} />

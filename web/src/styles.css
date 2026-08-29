@@ -113,3 +113,44 @@ button.icon:hover:not(:disabled) { color: var(--bad); }
 .rowactions { text-align: right; white-space: nowrap; }
 .pill.completed { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, transparent); }
 .pill.stopped, .pill.failed { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+
+/* ---------- charts ---------- */
+.chart-card { margin: 14px 0; }
+.chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.chart-head h3 { font-size: 12px; margin: 0 0 6px; color: var(--muted);
+                 text-transform: uppercase; letter-spacing: 0.05em; }
+.chart-head h2 { margin: 0 0 10px; }
+
+.chart-wrap { position: relative; width: 100%; }
+.chart-empty { display: flex; align-items: center; justify-content: center;
+               color: var(--muted); font-size: 12px; border: 1px dashed var(--border); border-radius: 8px; }
+
+/* Recessive chrome: solid hairlines, never dashed. */
+.grid { stroke: var(--border); stroke-width: 1; opacity: 0.55; }
+.axis { fill: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.series-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.crosshair { stroke: var(--muted); stroke-width: 1; opacity: 0.7; }
+.marker { stroke: var(--panel); stroke-width: 2; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 6px; }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.swatch { width: 9px; height: 9px; border-radius: 2px; display: inline-block; flex: 0 0 auto; }
+
+.tooltip {
+  position: absolute; top: 6px; pointer-events: none;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px;
+  padding: 7px 9px; font-size: 11px; min-width: 130px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+.tt-x { color: var(--muted); margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+.tt-row { display: flex; align-items: center; gap: 6px; }
+.tt-label { color: var(--text); flex: 1 1 auto; }
+.tt-val { font-variant-numeric: tabular-nums; color: var(--text); }
+
+.table-scroll { max-height: 200px; overflow: auto; }
+.compare td:first-child { display: flex; align-items: center; gap: 7px; }
+.pick { width: 34px; white-space: nowrap; }
+.pick input { accent-color: var(--accent); }
+.status.queued { color: var(--accent); }
+.pill.queued { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.pill.cancelled { color: var(--muted); }

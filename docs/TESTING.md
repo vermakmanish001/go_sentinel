@@ -286,6 +286,38 @@ Other behaviours worth checking:
 - **Durability.** `docker restart gosentinel-api` preserves history; the SQLite
   file lives on the `api-data` volume.
 
+## Tier 4f — Queue, charts and comparison
+
+Submit three runs back to back. None should be rejected, and exactly one should
+be `RUNNING` at any moment:
+
+```bash
+for i in 1 2 3; do
+  curl -s -X POST localhost:8090/api/runs -H 'Content-Type: application/json' -d "{
+    \"name\":\"queued $i\",\"stages\":[{\"duration\":\"8s\",\"target_vus\":4}],
+    \"http\":{\"base_url\":\"http://httpbin:8080\",\"timeout\":\"5s\",
+             \"requests\":[{\"method\":\"GET\",\"path\":\"/get\"}]}}"; echo
+done
+
+watch -n2 'curl -s "localhost:8090/api/runs?limit=3"'
+```
+
+A passing run reported `QUEUED` with positions 0, 0 and 1, then drained strictly
+in order: `RUNN QUEU QUEU` → `COMP RUNN QUEU` → `COMP COMP RUNN` → all `COMP`.
+
+- **Cancel vs stop.** `POST /api/runs/{id}/stop` on a *queued* run returns
+  "run cancelled before it started" and leaves it `CANCELLED`; on a *running*
+  run it reports how many workers stopped and leaves it `STOPPED`.
+- **Transient dispatch failures retry.** A run submitted while no workers are
+  registered stays queued and is retried; it only fails after several attempts.
+  Look for `dispatch failed, will retry` in the API log.
+- **Interrupted runs.** Restart the API mid-run: the orphaned run is marked
+  `FAILED` at startup rather than blocking the queue forever.
+
+Chart data comes from `/api/runs/{id}/series`. A run alternating `/get` and
+`/status/500` should show RPS ramping with the VU count, non-zero p95/p99, and a
+steady 50% error rate — three separate plots, never two scales on one axis.
+
 ## Tier 5 — Observability surfaces
 
 | Surface | URL | Expected |

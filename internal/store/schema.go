@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS runs (
     status         TEXT    NOT NULL,
     started_at     INTEGER NOT NULL,
     finished_at    INTEGER,
+    dispatched_at  INTEGER,
     workers        INTEGER NOT NULL DEFAULT 0,
     peak_vus       INTEGER NOT NULL DEFAULT 0,
     total_requests INTEGER NOT NULL DEFAULT 0,
@@ -37,6 +38,7 @@ CREATE TABLE IF NOT EXISTS runs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_runs_started ON runs(started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_runs_status  ON runs(status, started_at);
 
 CREATE TABLE IF NOT EXISTS samples (
     run_id   TEXT    NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
@@ -52,3 +54,11 @@ CREATE TABLE IF NOT EXISTS samples (
     PRIMARY KEY (run_id, ts_ms)
 );
 `
+
+// migrations run after schema, bringing databases created by earlier versions
+// up to date. Each is written to be harmless if already applied; SQLite has no
+// "ADD COLUMN IF NOT EXISTS", so a duplicate-column error is expected and
+// ignored by applyMigrations.
+var migrations = []string{
+	`ALTER TABLE runs ADD COLUMN dispatched_at INTEGER`,
+}

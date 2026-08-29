@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
-	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -28,12 +27,7 @@ type Server struct {
 	ui       fs.FS
 	store    store.Store
 	recorder *Recorder
-
-	// A worker can only execute one test at a time, and concurrent runs would
-	// contend for the same goroutine and connection pools — skewing the very
-	// latency numbers the tool exists to measure. Runs are therefore serialised.
-	mu          sync.Mutex
-	activeRunID string
+	queue    *Queue
 }
 
 // uiBuilt reports whether the embedded frontend actually contains a build, as
@@ -56,8 +50,12 @@ func New(
 ) *Server {
 	s := &Server{orch: orch, parser: parser, store: st, ui: ui, logger: logger}
 	s.recorder = NewRecorder(orch, st, logger)
+	s.queue = NewQueue(st, orch, s.recorder, parser, logger)
 	return s
 }
+
+// Start begins draining the run queue. It must be called before serving.
+func (s *Server) Start(ctx context.Context) { s.queue.Start(ctx) }
 
 // Routes builds the HTTP handler.
 func (s *Server) Routes() http.Handler {
@@ -104,9 +102,10 @@ type StartRunRequest struct {
 }
 
 type StartRunResponse struct {
-	TestID          string           `json:"test_id"`
-	WorkersAssigned int32            `json:"workers_assigned"`
-	Distribution    map[string]int32 `json:"distribution"`
+	TestID string `json:"test_id"`
+	Status string `json:"status"`
+	// Position is how many runs are ahead of this one; 0 means it starts next.
+	Position int `json:"position"`
 }
 
 func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
@@ -116,32 +115,12 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate before queueing: a plan that cannot run should be rejected while
+	// the caller is still there to see why, not minutes later at the front of
+	// the queue.
 	scenario, err := s.parser.FromSpec(req.YAMLTestPlan)
 	if err != nil {
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
-
-	s.mu.Lock()
-	if s.activeRunID != "" {
-		active := s.activeRunID
-		s.mu.Unlock()
-		writeError(w, http.StatusConflict, fmt.Sprintf("run %s is still in flight; only one run executes at a time", active))
-		return
-	}
-	testID := fmt.Sprintf("run-%d", time.Now().UnixMilli())
-	s.activeRunID = testID
-	s.mu.Unlock()
-
-	plan := runtime.ScenarioToProto(scenario, testID)
-
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-	defer cancel()
-
-	resp, err := s.orch.DistributeTestPlan(ctx, &pborchestrator.DistributeRequest{Plan: plan})
-	if err != nil {
-		s.clearActiveRun(testID)
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("orchestrator rejected the plan: %v", err))
 		return
 	}
 
@@ -151,43 +130,37 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 			peakVUs = int(st.TargetVUs)
 		}
 	}
+
+	testID := fmt.Sprintf("run-%d", time.Now().UnixMilli())
 	specJSON, _ := json.Marshal(req.YAMLTestPlan)
 
 	if err := s.store.CreateRun(r.Context(), store.Run{
 		ID:        testID,
 		Name:      scenario.Name,
 		PlanSpec:  string(specJSON),
-		Status:    "RUNNING",
+		Status:    StatusQueued,
 		StartedAt: time.Now().UnixMilli(),
-		Workers:   int(resp.WorkersAssigned),
 		PeakVUs:   peakVUs,
 	}); err != nil {
-		s.logger.Error("failed to record run", zap.String("test_id", testID), zap.Error(err))
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("could not queue run: %v", err))
+		return
 	}
 
-	// The recorder persists samples and releases the run slot on completion,
-	// so history is captured whether or not a dashboard is connected.
-	s.recorder.Start(testID, func(string) { s.clearActiveRun(testID) })
+	s.queue.Notify()
 
-	s.logger.Info("run started",
+	position, _ := s.store.CountQueuedBefore(r.Context(), testID)
+
+	s.logger.Info("run queued",
 		zap.String("test_id", testID),
 		zap.String("name", scenario.Name),
-		zap.Int32("workers", resp.WorkersAssigned),
+		zap.Int("ahead", position),
 	)
 
 	writeJSON(w, http.StatusAccepted, StartRunResponse{
-		TestID:          resp.TestId,
-		WorkersAssigned: resp.WorkersAssigned,
-		Distribution:    resp.WorkerVuDistribution,
+		TestID:   testID,
+		Status:   StatusQueued,
+		Position: position,
 	})
-}
-
-func (s *Server) clearActiveRun(testID string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.activeRunID == testID {
-		s.activeRunID = ""
-	}
 }
 
 func isTerminal(st pborchestrator.TestStatusResponse_Status) bool {
@@ -209,6 +182,7 @@ type RunStatus struct {
 	TotalVUs      int32      `json:"total_vus"`
 	Metrics       *Metrics   `json:"metrics,omitempty"`
 	Run           *store.Run `json:"run,omitempty"`
+	Position      int        `json:"position,omitempty"`
 }
 
 // handleRunStatus reports a run from history, merging in live metrics while it
@@ -229,6 +203,12 @@ func (s *Server) handleRunStatus(w http.ResponseWriter, r *http.Request) {
 		Run:    &run,
 	}
 
+	if run.Status == StatusQueued {
+		if pos, err := s.store.CountQueuedBefore(r.Context(), testID); err == nil {
+			out.Position = pos
+		}
+	}
+
 	if _, live := s.recorder.Session(testID); live {
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
@@ -246,6 +226,12 @@ func (s *Server) handleRunStatus(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleStopRun(w http.ResponseWriter, r *http.Request) {
 	testID := r.PathValue("id")
 
+	// A queued run has nothing to stop on the workers; cancel it in place.
+	if err := s.queue.Cancel(r.Context(), testID); err == nil {
+		writeJSON(w, http.StatusOK, map[string]string{"message": "run cancelled before it started"})
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 
@@ -259,7 +245,6 @@ func (s *Server) handleStopRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.clearActiveRun(testID)
 	writeJSON(w, http.StatusOK, map[string]string{"message": resp.Message})
 }
 
@@ -311,14 +296,10 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		orchestrator = "unreachable"
 	}
 
-	s.mu.Lock()
-	active := s.activeRunID
-	s.mu.Unlock()
-
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":        "ok",
 		"orchestrator":  orchestrator,
-		"active_run_id": active,
+		"active_run_id": s.queue.Current(),
 	})
 }
 

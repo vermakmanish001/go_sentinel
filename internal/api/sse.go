@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	pbmetrics "github.com/vermakmanish001/go_sentinel/proto/metrics"
 )
@@ -89,16 +90,11 @@ func (s *Server) handleStreamRun(w http.ResponseWriter, r *http.Request) {
 
 	sess, live := s.recorder.Session(testID)
 	if !live {
-		// The run already finished. Report its stored outcome and close, rather
-		// than holding a connection open that will never produce an event; the
-		// dashboard fetches the recorded series separately.
-		run, err := s.store.GetRun(r.Context(), testID)
-		if err != nil {
-			sendEvent(w, flusher, "end", map[string]string{"status": "UNKNOWN"})
+		var ok bool
+		sess, ok = s.awaitDispatch(r, w, flusher, testID)
+		if !ok {
 			return
 		}
-		sendEvent(w, flusher, "end", map[string]string{"status": run.Status})
-		return
 	}
 
 	events, unsubscribe := sess.subscribe()
@@ -116,6 +112,46 @@ func (s *Server) handleStreamRun(w http.ResponseWriter, r *http.Request) {
 			if ev.Type == "end" {
 				return
 			}
+		}
+	}
+}
+
+// awaitDispatch holds the stream open while a run waits its turn, reporting its
+// queue position, and hands back the session once it starts. It returns false
+// when the run is already finished or will never start.
+func (s *Server) awaitDispatch(
+	r *http.Request, w http.ResponseWriter, flusher http.Flusher, testID string,
+) (*session, bool) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		run, err := s.store.GetRun(r.Context(), testID)
+		if err != nil {
+			sendEvent(w, flusher, "end", map[string]string{"status": "UNKNOWN"})
+			return nil, false
+		}
+
+		if run.Status != StatusQueued {
+			// It either started while we were waiting, or it is already over.
+			if sess, live := s.recorder.Session(testID); live {
+				return sess, true
+			}
+			sendEvent(w, flusher, "end", map[string]string{"status": run.Status})
+			return nil, false
+		}
+
+		position, _ := s.store.CountQueuedBefore(r.Context(), testID)
+		sendEvent(w, flusher, "status", RunStatus{
+			TestID:   testID,
+			Status:   StatusQueued,
+			Position: position,
+		})
+
+		select {
+		case <-r.Context().Done():
+			return nil, false
+		case <-ticker.C:
 		}
 	}
 }

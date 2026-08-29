@@ -114,6 +114,12 @@ configuration is needed.
 | `GET`/`POST` | `/api/plans` | List and save reusable plans |
 | `PUT`/`DELETE` | `/api/plans/{id}` | Update or remove a saved plan |
 
+The dashboard charts throughput, latency percentiles and error rate as separate
+plots — never two scales on one axis — with a crosshair tooltip, a table view for
+each, and a comparison overlay that indexes runs to elapsed time so runs from
+different days line up. Comparison colours are bound to the run, so removing one
+never repaints the others.
+
 The JSON plan uses the same schema as the YAML files in `examples/`, so a plan
 built in the UI and one written by hand go through identical validation. Runs
 are serialised — starting one while another is in flight returns `409`, because

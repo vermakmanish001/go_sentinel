@@ -7,7 +7,7 @@ const fmtDuration = (run) => {
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`
 }
 
-export default function HistoryPanel({ runs, activeId, onSelect, onDelete, onReplay }) {
+export default function HistoryPanel({ runs, activeId, selected, colorFor, onSelect, onToggleCompare, onDelete, onReplay }) {
   return (
     <div className="card">
       <h2>Run history</h2>
@@ -16,12 +16,21 @@ export default function HistoryPanel({ runs, activeId, onSelect, onDelete, onRep
       ) : (
         <table className="grid history">
           <thead>
-            <tr><th>Run</th><th>Status</th><th>Peak RPS</th><th>Errors</th><th>Duration</th><th /></tr>
+            <tr><th /><th>Run</th><th>Status</th><th>Peak RPS</th><th>Errors</th><th>Duration</th><th /></tr>
           </thead>
           <tbody>
             {runs.map((r) => (
               <tr key={r.id} className={r.id === activeId ? 'selected' : ''}
                   onClick={() => onSelect(r)}>
+                <td className="pick" onClick={(e) => e.stopPropagation()}>
+                  <input type="checkbox" aria-label={`Compare ${r.name || r.id}`}
+                    disabled={!r.finished_at}
+                    checked={selected.includes(r.id)}
+                    onChange={() => onToggleCompare(r)} />
+                  {selected.includes(r.id) && (
+                    <span className="swatch" style={{ background: colorFor(r.id) }} />
+                  )}
+                </td>
                 <td>
                   <div className="run-name">{r.name || r.id}</div>
                   <div className="run-time">{fmtTime(r.started_at)}</div>
