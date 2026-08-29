@@ -44,6 +44,12 @@ coming up unprotected. Create the first account either way:
 ./bin/api --create-user alice
 ```
 
+Once one account exists, the rest are managed from the dashboard's **Accounts**
+panel — no shell access needed. There is deliberately no self-signup: an account
+can point the whole fleet at any allowed target, so access is granted by someone
+who already has it. You cannot delete your own account or the last remaining
+one, since the server refuses to start with auth enabled and no users.
+
 or let a fresh deployment bootstrap itself:
 
 ```yaml

@@ -6,6 +6,7 @@ import HistoryPanel from './components/HistoryPanel.jsx'
 import PlansPanel from './components/PlansPanel.jsx'
 import ComparePanel from './components/ComparePanel.jsx'
 import LoginScreen from './components/LoginScreen.jsx'
+import UsersPanel from './components/UsersPanel.jsx'
 import { MAX_COMPARE, SERIES } from './palette.js'
 import {
   AuthError, deletePlan, deleteRun, getMe, getSeries, getWorkers, listPlans,
@@ -76,7 +77,7 @@ export default function App() {
     getMe()
       .then((me) => setSession(
         !me.auth_required || me.username
-          ? { state: 'in', username: me.username }
+          ? { state: 'in', username: me.username, authEnabled: !!me.auth_required }
           : { state: 'out' }))
       .catch(() => setSession({ state: 'out' }))
   }, [])
@@ -216,7 +217,7 @@ export default function App() {
 
   if (session.state === 'loading') return <div className="login-wrap"><p className="hint">Loading…</p></div>
   if (session.state === 'out') {
-    return <LoginScreen onSignedIn={(username) => setSession({ state: 'in', username })} />
+    return <LoginScreen onSignedIn={(username) => setSession({ state: 'in', username, authEnabled: true })} />
   }
 
   return (
@@ -263,6 +264,9 @@ export default function App() {
             onSave={handleSavePlan}
             onLoad={(p) => loadSpec(p.spec, p.name)}
             onDelete={handleDeletePlan} />
+          {session.authEnabled && (
+            <UsersPanel currentUser={session.username} onError={setError} />
+          )}
         </section>
 
         <section className="col">

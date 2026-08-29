@@ -183,3 +183,68 @@ func TestPlanCRUD(t *testing.T) {
 		t.Errorf("second delete err = %v, want ErrNotFound", err)
 	}
 }
+
+func TestUserCRUDAndSessionCascade(t *testing.T) {
+	ctx := context.Background()
+	st := newTestStore(t)
+
+	u, err := st.CreateUser(ctx, "alice", "hash-a")
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	if _, err := st.CreateUser(ctx, "bob", "hash-b"); err != nil {
+		t.Fatalf("CreateUser bob: %v", err)
+	}
+
+	// Usernames are case-insensitively unique, so "Alice" cannot shadow "alice".
+	if _, err := st.CreateUser(ctx, "Alice", "hash-c"); err == nil {
+		t.Error("duplicate username accepted (case-insensitive uniqueness not enforced)")
+	}
+
+	users, err := st.ListUsers(ctx)
+	if err != nil {
+		t.Fatalf("ListUsers: %v", err)
+	}
+	if len(users) != 2 {
+		t.Fatalf("got %d users, want 2", len(users))
+	}
+	for _, listed := range users {
+		if listed.PasswordHash != "" {
+			t.Errorf("ListUsers leaked a password hash for %q", listed.Username)
+		}
+	}
+
+	// A live session must stop resolving the moment its user is deleted.
+	if err := st.CreateSession(ctx, "tokenhash", u.ID, nowMs()+60_000); err != nil {
+		t.Fatalf("CreateSession: %v", err)
+	}
+	if _, err := st.UserForSession(ctx, "tokenhash", nowMs()); err != nil {
+		t.Fatalf("session should resolve before deletion: %v", err)
+	}
+
+	if err := st.DeleteUser(ctx, u.ID); err != nil {
+		t.Fatalf("DeleteUser: %v", err)
+	}
+	if _, err := st.UserForSession(ctx, "tokenhash", nowMs()); !errors.Is(err, ErrNotFound) {
+		t.Error("session survived its user being deleted; the cascade is not working")
+	}
+	if err := st.DeleteUser(ctx, u.ID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("second delete err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestExpiredSessionsDoNotResolve(t *testing.T) {
+	ctx := context.Background()
+	st := newTestStore(t)
+
+	u, _ := st.CreateUser(ctx, "alice", "hash")
+	_ = st.CreateSession(ctx, "expired", u.ID, nowMs()-1)
+
+	if _, err := st.UserForSession(ctx, "expired", nowMs()); !errors.Is(err, ErrNotFound) {
+		t.Error("an expired session still resolved")
+	}
+	n, err := st.PurgeExpiredSessions(ctx, nowMs())
+	if err != nil || n != 1 {
+		t.Errorf("PurgeExpiredSessions = %d, %v; want 1, nil", n, err)
+	}
+}

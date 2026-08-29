@@ -28,6 +28,15 @@ export const login = (username, password) =>
     body: JSON.stringify({ username, password }),
   })
 export const logout = () => request('/api/auth/logout', { method: 'POST' })
+
+export const listUsers = () => request('/api/users')
+export const createUser = (username, password) =>
+  request('/api/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  })
+export const deleteUser = (id) => request(`/api/users/${id}`, { method: 'DELETE' })
 export const listRuns = (limit = 25) => request(`/api/runs?limit=${limit}`)
 export const getSeries = (id) => request(`/api/runs/${id}/series`)
 export const deleteRun = (id) => request(`/api/runs/${id}`, { method: 'DELETE' })

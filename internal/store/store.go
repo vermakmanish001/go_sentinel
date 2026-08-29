@@ -96,6 +96,8 @@ type Store interface {
 	CreateUser(ctx context.Context, username, passwordHash string) (User, error)
 	GetUserByName(ctx context.Context, username string) (User, error)
 	CountUsers(ctx context.Context) (int, error)
+	ListUsers(ctx context.Context) ([]User, error)
+	DeleteUser(ctx context.Context, id int64) error
 
 	CreateSession(ctx context.Context, tokenHash string, userID int64, expiresAt int64) error
 	// UserForSession resolves a live session, rejecting expired ones.
@@ -360,6 +362,38 @@ func (s *sqliteStore) CountUsers(ctx context.Context) (int, error) {
 	var n int
 	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`).Scan(&n)
 	return n, err
+}
+
+func (s *sqliteStore) ListUsers(ctx context.Context) ([]User, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, username, created_at FROM users ORDER BY username COLLATE NOCASE`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := make([]User, 0)
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(&u.ID, &u.Username, &u.CreatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
+// DeleteUser removes an account. Its sessions go with it via the foreign key,
+// so a deleted user is signed out everywhere immediately.
+func (s *sqliteStore) DeleteUser(ctx context.Context, id int64) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *sqliteStore) CreateSession(ctx context.Context, tokenHash string, userID, expiresAt int64) error {

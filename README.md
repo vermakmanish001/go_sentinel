@@ -110,6 +110,10 @@ A **target allowlist** restricts which hosts a plan may point at. Cloud instance
 metadata is blocked even when the list is empty. An empty list means any host and
 logs a startup warning — fine locally, not for a deployment.
 
+Accounts are managed from the dashboard's **Accounts** panel, or with
+`./bin/api --create-user <name>` for the first one. There is no self-signup by
+design — an account can drive the whole fleet.
+
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ### API

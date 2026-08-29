@@ -95,6 +95,9 @@ func (s *Server) Routes() http.Handler {
 		"POST /api/plans":           s.handleCreatePlan,
 		"PUT /api/plans/{id}":       s.handleUpdatePlan,
 		"DELETE /api/plans/{id}":    s.handleDeletePlan,
+		"GET /api/users":            s.handleListUsers,
+		"POST /api/users":           s.handleCreateUser,
+		"DELETE /api/users/{id}":    s.handleDeleteUser,
 	}
 	for pattern, handler := range protected {
 		mux.HandleFunc(pattern, s.requireAuth(handler))
