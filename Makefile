@@ -1,4 +1,4 @@
-.PHONY: proto build up down scale run-example clean test
+.PHONY: proto build ui api dev-ui docker-build up down scale run-example clean test deps
 
 # Generate protobuf files
 proto:
@@ -9,12 +9,32 @@ proto:
 		--proto_path=. \
 		proto/orchestrator/orchestrator.proto proto/worker/worker.proto proto/metrics/metrics.proto
 
-# Build all binaries
+# Build all binaries. Does not require Node: the dashboard is embedded from
+# web/dist, which ships with a placeholder until `make ui` populates it.
 build: proto
 	@echo "Building binaries..."
 	@go build -o bin/orchestrator ./cmd/orchestrator
 	@go build -o bin/worker ./cmd/worker
 	@go build -o bin/cli ./cmd/cli
+	@go build -o bin/api ./cmd/api
+
+# Build the React dashboard into web/dist
+ui:
+	@echo "Building dashboard..."
+	@cd web && npm install --no-audit --no-fund --silent && npm run build
+	@# vite empties dist/ on every build; the placeholder must survive so that
+	@# go:embed still finds the directory in a clean checkout.
+	@touch web/dist/.gitkeep
+
+# Dashboard + API server, ready to serve as a single binary
+api: ui
+	@echo "Building api with embedded dashboard..."
+	@go build -o bin/api ./cmd/api
+	@echo "Run it with: ./bin/api   (dashboard on http://localhost:8090)"
+
+# Frontend dev server with hot reload, proxying /api to a local api binary
+dev-ui:
+	@cd web && npm install --no-audit --no-fund --silent && npm run dev
 
 # Build Docker images
 docker-build:
@@ -51,6 +71,7 @@ clean:
 	@echo "Cleaning..."
 	@rm -rf bin/
 	@rm -rf proto/*/*.pb.go
+	@rm -rf web/dist/assets web/node_modules
 	@go clean
 
 # Run tests

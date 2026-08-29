@@ -215,6 +215,44 @@ inheriting the previous run's totals.
 
 ---
 
+## Tier 4d — The dashboard and its API
+
+```bash
+make api && ./bin/api
+```
+
+```bash
+curl -s localhost:8090/api/health   | python3 -m json.tool   # orchestrator: ok
+curl -s localhost:8090/api/workers  | python3 -m json.tool   # 3 workers, capacity 3000
+```
+
+Start a run and consume the event stream the dashboard consumes:
+
+```bash
+RUN=$(curl -s -X POST localhost:8090/api/runs -H 'Content-Type: application/json' -d '{
+  "name":"smoke","stages":[{"duration":"15s","target_vus":6},{"duration":"15s","target_vus":12}],
+  "http":{"base_url":"http://httpbin:8080","timeout":"5s",
+          "requests":[{"method":"GET","path":"/get","assertions":[{"status_code":200}]}]}}' \
+  | python3 -c 'import sys,json;print(json.load(sys.stdin)["test_id"])')
+
+curl -sN "localhost:8090/api/runs/$RUN/stream"
+```
+
+Expect one `metrics` and one `status` event per second, then a single `end`
+event carrying `COMPLETED`. A passing run: RPS climbed 41 → 114 as VUs went
+6 → 12, 0% errors, 31 metrics events, 2,670 requests.
+
+Two behaviours worth checking explicitly:
+
+- **Invalid plans are rejected before dispatch.** A stage with `target_vus: 0`
+  returns `422` with `validation failed: stage 0: target_vus must be positive`.
+- **Runs are serialised.** Starting a second run while one is in flight returns
+  `409`; the slot frees automatically once the orchestrator reports a terminal
+  status, with no browser attached.
+
+Note the API listens on **8090**, not 8080 — 8080 belongs to the bundled
+httpbin load target.
+
 ## Tier 5 — Observability surfaces
 
 | Surface | URL | Expected |
@@ -223,6 +261,7 @@ inheriting the previous run's totals.
 | Prometheus | http://localhost:9091 | Targets: orchestrator + `docker-worker-1..3` UP |
 | Grafana | http://localhost:3000 (admin/admin) | Loads, but **no dashboards** |
 | Jaeger | http://localhost:16686 | **No traces** |
+| Dashboard / API | http://localhost:8090 | The web UI and its JSON+SSE API |
 | httpbin | http://localhost:8080 | The load target |
 
 ---

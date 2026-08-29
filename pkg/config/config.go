@@ -14,6 +14,7 @@ type Config struct {
 	Orchestrator OrchestratorConfig
 	Worker       WorkerConfig
 	CLI          CLIConfig
+	API          APIConfig
 	Etcd         EtcdConfig
 	Tracing      TracingConfig
 	Logging      LoggingConfig
@@ -36,6 +37,13 @@ type WorkerConfig struct {
 	MaxVUs            int
 	OrchestratorURL   string
 	HeartbeatInterval time.Duration
+}
+
+// APIConfig represents HTTP API / dashboard configuration
+type APIConfig struct {
+	Address         string
+	Port            int
+	OrchestratorURL string
 }
 
 // CLIConfig represents CLI-specific configuration
@@ -76,6 +84,11 @@ func Load() (*Config, error) {
 	viper.SetDefault("worker.port", 50052)
 	viper.SetDefault("worker.max_vus", 1000)
 	viper.SetDefault("worker.heartbeat_interval", "10s")
+
+	viper.SetDefault("api.address", "0.0.0.0")
+	// 8080 is taken by the bundled httpbin load target in docker-compose.
+	viper.SetDefault("api.port", 8090)
+	viper.SetDefault("api.orchestrator_url", "localhost:50051")
 
 	viper.SetDefault("cli.orchestrator_url", "localhost:50051")
 	viper.SetDefault("cli.refresh_interval", "1s")
@@ -128,6 +141,11 @@ func Load() (*Config, error) {
 	cfg.Worker.MaxVUs = viper.GetInt("worker.max_vus")
 	cfg.Worker.OrchestratorURL = viper.GetString("worker.orchestrator_url")
 	cfg.Worker.HeartbeatInterval = viper.GetDuration("worker.heartbeat_interval")
+
+	// API config
+	cfg.API.Address = viper.GetString("api.address")
+	cfg.API.Port = viper.GetInt("api.port")
+	cfg.API.OrchestratorURL = viper.GetString("api.orchestrator_url")
 
 	// CLI config
 	cfg.CLI.OrchestratorURL = viper.GetString("cli.orchestrator_url")

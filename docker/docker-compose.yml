@@ -65,6 +65,26 @@ services:
       timeout: 5s
       retries: 5
 
+  api:
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    container_name: gosentinel-api
+    environment:
+      - GOSENTINEL_API_ADDRESS=0.0.0.0
+      - GOSENTINEL_API_PORT=8090
+      - GOSENTINEL_API_ORCHESTRATOR_URL=orchestrator:50051
+      - GOSENTINEL_LOGGING_LEVEL=info
+    ports:
+      - "8090:8090"
+    depends_on:
+      - orchestrator
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8090/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   httpbin:
     image: mccutchen/go-httpbin
     container_name: gosentinel-httpbin

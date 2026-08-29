@@ -73,6 +73,48 @@ make build
 make run-example
 ```
 
+## Web dashboard
+
+A browser UI for building and running tests — no YAML required. Enter a base
+URL, add stages and requests with assertions, hit Run, and watch throughput,
+latency percentiles and errors stream in live.
+
+```bash
+make api        # builds the React dashboard and embeds it in bin/api
+./bin/api       # http://localhost:8090
+```
+
+The dashboard ships inside the Go binary via `go:embed`, so production is a
+single artifact with no separate static host. It is also part of the Docker
+stack (`make up`) on port 8090.
+
+### Frontend development
+
+```bash
+./bin/api                    # terminal 1: API on :8090
+make dev-ui                  # terminal 2: Vite with hot reload on :5173
+```
+
+Vite proxies `/api` to the Go server, so the browser sees one origin and no CORS
+configuration is needed.
+
+### API
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/runs` | Start a run from a JSON plan |
+| `GET` | `/api/runs/{id}` | Run status and current metrics |
+| `GET` | `/api/runs/{id}/stream` | Server-Sent Events: `metrics`, `status`, `end` |
+| `POST` | `/api/runs/{id}/stop` | Stop a run on every assigned worker |
+| `GET` | `/api/workers` | Registered workers and total VU capacity |
+| `GET` | `/api/health` | Liveness plus orchestrator reachability |
+
+The JSON plan uses the same schema as the YAML files in `examples/`, so a plan
+built in the UI and one written by hand go through identical validation. Runs
+are serialised — starting one while another is in flight returns `409`, because
+concurrent runs on shared workers contend for the same connection pools and
+distort the latency they are meant to measure.
+
 ## Configuration
 
 Configuration can be provided via:
