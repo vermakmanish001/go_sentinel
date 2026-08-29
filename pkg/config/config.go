@@ -44,6 +44,8 @@ type APIConfig struct {
 	Address         string
 	Port            int
 	OrchestratorURL string
+	// DBPath is the SQLite file holding run history and saved plans.
+	DBPath string
 }
 
 // CLIConfig represents CLI-specific configuration
@@ -89,6 +91,7 @@ func Load() (*Config, error) {
 	// 8080 is taken by the bundled httpbin load target in docker-compose.
 	viper.SetDefault("api.port", 8090)
 	viper.SetDefault("api.orchestrator_url", "localhost:50051")
+	viper.SetDefault("api.db_path", "gosentinel.db")
 
 	viper.SetDefault("cli.orchestrator_url", "localhost:50051")
 	viper.SetDefault("cli.refresh_interval", "1s")
@@ -146,6 +149,7 @@ func Load() (*Config, error) {
 	cfg.API.Address = viper.GetString("api.address")
 	cfg.API.Port = viper.GetInt("api.port")
 	cfg.API.OrchestratorURL = viper.GetString("api.orchestrator_url")
+	cfg.API.DBPath = viper.GetString("api.db_path")
 
 	// CLI config
 	cfg.CLI.OrchestratorURL = viper.GetString("cli.orchestrator_url")

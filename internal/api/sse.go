@@ -1,14 +1,11 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	pbmetrics "github.com/vermakmanish001/go_sentinel/proto/metrics"
-	pborchestrator "github.com/vermakmanish001/go_sentinel/proto/orchestrator"
 )
 
 // Metrics is the wire shape the dashboard consumes.
@@ -68,8 +65,11 @@ func metricsFromProto(s *pbmetrics.MetricSnapshot) *Metrics {
 	return m
 }
 
-// handleStreamRun streams a run's metrics as Server-Sent Events, and emits a
-// terminal `end` event so the dashboard knows to stop without polling.
+// handleStreamRun streams a run's metrics as Server-Sent Events.
+//
+// It subscribes to the recorder rather than opening its own gRPC stream, so
+// every dashboard watching a run sees exactly the samples that were persisted,
+// and N viewers cost one orchestrator stream rather than N.
 func (s *Server) handleStreamRun(w http.ResponseWriter, r *http.Request) {
 	testID := r.PathValue("id")
 
@@ -87,90 +87,34 @@ func (s *Server) handleStreamRun(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
-	ctx, cancel := context.WithCancel(r.Context())
-	defer cancel()
-
-	stream, err := s.orch.StreamMetrics(ctx, &pborchestrator.StreamMetricsRequest{TestId: testID})
-	if err != nil {
-		sendEvent(w, flusher, "error", map[string]string{"error": err.Error()})
+	sess, live := s.recorder.Session(testID)
+	if !live {
+		// The run already finished. Report its stored outcome and close, rather
+		// than holding a connection open that will never produce an event; the
+		// dashboard fetches the recorded series separately.
+		run, err := s.store.GetRun(r.Context(), testID)
+		if err != nil {
+			sendEvent(w, flusher, "end", map[string]string{"status": "UNKNOWN"})
+			return
+		}
+		sendEvent(w, flusher, "end", map[string]string{"status": run.Status})
 		return
 	}
 
-	// Metrics arrive on the gRPC stream; run status is polled alongside so the
-	// dashboard learns about completion even though metrics keep flowing.
-	statusCh := make(chan *pborchestrator.TestStatusResponse, 1)
-	go s.pollStatus(ctx, testID, statusCh)
-
-	metricsCh := make(chan *pbmetrics.MetricSnapshot)
-	go func() {
-		defer close(metricsCh)
-		for {
-			resp, err := stream.Recv()
-			if err != nil {
-				return
-			}
-			select {
-			case metricsCh <- resp.Snapshot:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
+	events, unsubscribe := sess.subscribe()
+	defer unsubscribe()
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-r.Context().Done():
 			return
-
-		case snapshot, open := <-metricsCh:
+		case ev, open := <-events:
 			if !open {
-				sendEvent(w, flusher, "end", map[string]string{"reason": "metrics stream closed"})
 				return
 			}
-			if m := metricsFromProto(snapshot); m != nil {
-				sendEvent(w, flusher, "metrics", m)
-			}
-
-		case st := <-statusCh:
-			sendEvent(w, flusher, "status", RunStatus{
-				TestID:        testID,
-				Status:        st.Status.String(),
-				ActiveWorkers: st.ActiveWorkers,
-				TotalVUs:      st.TotalVus,
-			})
-			if isTerminal(st.Status) {
-				// One last metrics read so the dashboard shows final totals
-				// rather than whatever arrived a second before the end.
-				if final, err := s.orch.GetTestStatus(ctx, &pborchestrator.TestStatusRequest{TestId: testID}); err == nil {
-					if m := metricsFromProto(final.CurrentMetrics); m != nil {
-						sendEvent(w, flusher, "metrics", m)
-					}
-				}
-				sendEvent(w, flusher, "end", map[string]string{"status": st.Status.String()})
+			sendEvent(w, flusher, ev.Type, ev.Data)
+			if ev.Type == "end" {
 				return
-			}
-		}
-	}
-}
-
-func (s *Server) pollStatus(ctx context.Context, testID string, out chan<- *pborchestrator.TestStatusResponse) {
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			resp, err := s.orch.GetTestStatus(ctx, &pborchestrator.TestStatusRequest{TestId: testID})
-			if err != nil {
-				continue
-			}
-			select {
-			case out <- resp:
-			case <-ctx.Done():
-				return
-			default: // consumer is busy; the next tick will carry fresher state
 			}
 		}
 	}

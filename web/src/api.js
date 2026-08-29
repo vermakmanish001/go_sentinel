@@ -2,16 +2,30 @@ async function request(path, options) {
   const res = await fetch(path, options)
   const text = await res.text()
   let body = null
-  try {
-    body = text ? JSON.parse(text) : null
-  } catch {
-    throw new Error(text || `HTTP ${res.status}`)
+  if (text) {
+    try {
+      body = JSON.parse(text)
+    } catch {
+      throw new Error(text)
+    }
   }
   if (!res.ok) throw new Error(body?.error || `HTTP ${res.status}`)
   return body
 }
 
 export const getHealth = () => request('/api/health')
+export const listRuns = (limit = 25) => request(`/api/runs?limit=${limit}`)
+export const getSeries = (id) => request(`/api/runs/${id}/series`)
+export const deleteRun = (id) => request(`/api/runs/${id}`, { method: 'DELETE' })
+
+export const listPlans = () => request('/api/plans')
+export const savePlan = (name, spec) =>
+  request('/api/plans', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, spec }),
+  })
+export const deletePlan = (id) => request(`/api/plans/${id}`, { method: 'DELETE' })
 export const getWorkers = () => request('/api/workers')
 export const getRun = (id) => request(`/api/runs/${id}`)
 

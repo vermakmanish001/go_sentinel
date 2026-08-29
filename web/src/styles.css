@@ -102,3 +102,14 @@ button.icon:hover:not(:disabled) { color: var(--bad); }
 .banner { padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; cursor: pointer; }
 .banner.error { background: color-mix(in srgb, var(--bad) 15%, transparent);
                 border: 1px solid color-mix(in srgb, var(--bad) 45%, transparent); color: #ffd9dc; }
+
+.history tbody tr { cursor: pointer; }
+.history tbody tr:hover { background: var(--panel-2); }
+.history tr.selected { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.run-name { font-size: 13px; }
+.run-time { font-size: 11px; color: var(--muted); }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.bad-text { color: var(--bad); }
+.rowactions { text-align: right; white-space: nowrap; }
+.pill.completed { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, transparent); }
+.pill.stopped, .pill.failed { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }

@@ -16,15 +16,18 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/vermakmanish001/go_sentinel/internal/runtime"
+	"github.com/vermakmanish001/go_sentinel/internal/store"
 	pborchestrator "github.com/vermakmanish001/go_sentinel/proto/orchestrator"
 )
 
 // Server serves the HTTP API and, in production, the embedded frontend.
 type Server struct {
-	orch   pborchestrator.OrchestratorServiceClient
-	parser *runtime.Parser
-	logger *zap.Logger
-	ui     fs.FS
+	orch     pborchestrator.OrchestratorServiceClient
+	parser   *runtime.Parser
+	logger   *zap.Logger
+	ui       fs.FS
+	store    store.Store
+	recorder *Recorder
 
 	// A worker can only execute one test at a time, and concurrent runs would
 	// contend for the same goroutine and connection pools — skewing the very
@@ -44,8 +47,16 @@ func uiBuilt(ui fs.FS) bool {
 }
 
 // New creates an API server. ui may be nil, in which case only /api is served.
-func New(orch pborchestrator.OrchestratorServiceClient, parser *runtime.Parser, ui fs.FS, logger *zap.Logger) *Server {
-	return &Server{orch: orch, parser: parser, ui: ui, logger: logger}
+func New(
+	orch pborchestrator.OrchestratorServiceClient,
+	parser *runtime.Parser,
+	st store.Store,
+	ui fs.FS,
+	logger *zap.Logger,
+) *Server {
+	s := &Server{orch: orch, parser: parser, store: st, ui: ui, logger: logger}
+	s.recorder = NewRecorder(orch, st, logger)
+	return s
 }
 
 // Routes builds the HTTP handler.
@@ -55,9 +66,17 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/health", s.handleHealth)
 	mux.HandleFunc("GET /api/workers", s.handleWorkers)
 	mux.HandleFunc("POST /api/runs", s.handleStartRun)
+	mux.HandleFunc("GET /api/runs", s.handleListRuns)
 	mux.HandleFunc("GET /api/runs/{id}", s.handleRunStatus)
+	mux.HandleFunc("DELETE /api/runs/{id}", s.handleDeleteRun)
+	mux.HandleFunc("GET /api/runs/{id}/series", s.handleRunSeries)
 	mux.HandleFunc("POST /api/runs/{id}/stop", s.handleStopRun)
 	mux.HandleFunc("GET /api/runs/{id}/stream", s.handleStreamRun)
+
+	mux.HandleFunc("GET /api/plans", s.handleListPlans)
+	mux.HandleFunc("POST /api/plans", s.handleCreatePlan)
+	mux.HandleFunc("PUT /api/plans/{id}", s.handleUpdatePlan)
+	mux.HandleFunc("DELETE /api/plans/{id}", s.handleDeletePlan)
 
 	if uiBuilt(s.ui) {
 		mux.Handle("/", s.spaHandler())
@@ -126,7 +145,29 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go s.watchRun(testID)
+	var peakVUs int
+	for _, st := range scenario.Stages {
+		if int(st.TargetVUs) > peakVUs {
+			peakVUs = int(st.TargetVUs)
+		}
+	}
+	specJSON, _ := json.Marshal(req.YAMLTestPlan)
+
+	if err := s.store.CreateRun(r.Context(), store.Run{
+		ID:        testID,
+		Name:      scenario.Name,
+		PlanSpec:  string(specJSON),
+		Status:    "RUNNING",
+		StartedAt: time.Now().UnixMilli(),
+		Workers:   int(resp.WorkersAssigned),
+		PeakVUs:   peakVUs,
+	}); err != nil {
+		s.logger.Error("failed to record run", zap.String("test_id", testID), zap.Error(err))
+	}
+
+	// The recorder persists samples and releases the run slot on completion,
+	// so history is captured whether or not a dashboard is connected.
+	s.recorder.Start(testID, func(string) { s.clearActiveRun(testID) })
 
 	s.logger.Info("run started",
 		zap.String("test_id", testID),
@@ -139,40 +180,6 @@ func (s *Server) handleStartRun(w http.ResponseWriter, r *http.Request) {
 		WorkersAssigned: resp.WorkersAssigned,
 		Distribution:    resp.WorkerVuDistribution,
 	})
-}
-
-// watchRun releases the single-run slot once the orchestrator reports a
-// terminal status, so the next run can start without the browser being open.
-func (s *Server) watchRun(testID string) {
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-
-	// Backstop: never hold the slot forever if the orchestrator goes silent.
-	deadline := time.After(24 * time.Hour)
-
-	for {
-		select {
-		case <-deadline:
-			s.logger.Warn("run watcher timed out, releasing slot", zap.String("test_id", testID))
-			s.clearActiveRun(testID)
-			return
-		case <-ticker.C:
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			resp, err := s.orch.GetTestStatus(ctx, &pborchestrator.TestStatusRequest{TestId: testID})
-			cancel()
-			if err != nil {
-				continue
-			}
-			if isTerminal(resp.Status) {
-				s.logger.Info("run finished",
-					zap.String("test_id", testID),
-					zap.String("status", resp.Status.String()),
-				)
-				s.clearActiveRun(testID)
-				return
-			}
-		}
-	}
 }
 
 func (s *Server) clearActiveRun(testID string) {
@@ -196,32 +203,44 @@ func isTerminal(st pborchestrator.TestStatusResponse_Status) bool {
 // ---------- run status / stop ----------
 
 type RunStatus struct {
-	TestID        string   `json:"test_id"`
-	Status        string   `json:"status"`
-	ActiveWorkers int32    `json:"active_workers"`
-	TotalVUs      int32    `json:"total_vus"`
-	Metrics       *Metrics `json:"metrics,omitempty"`
+	TestID        string     `json:"test_id"`
+	Status        string     `json:"status"`
+	ActiveWorkers int32      `json:"active_workers"`
+	TotalVUs      int32      `json:"total_vus"`
+	Metrics       *Metrics   `json:"metrics,omitempty"`
+	Run           *store.Run `json:"run,omitempty"`
 }
 
+// handleRunStatus reports a run from history, merging in live metrics while it
+// is still executing. History is authoritative so a restarted orchestrator does
+// not erase past runs.
 func (s *Server) handleRunStatus(w http.ResponseWriter, r *http.Request) {
 	testID := r.PathValue("id")
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-	defer cancel()
-
-	resp, err := s.orch.GetTestStatus(ctx, &pborchestrator.TestStatusRequest{TestId: testID})
+	run, err := s.store.GetRun(r.Context(), testID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("run not found: %s", testID))
 		return
 	}
 
-	writeJSON(w, http.StatusOK, RunStatus{
-		TestID:        testID,
-		Status:        resp.Status.String(),
-		ActiveWorkers: resp.ActiveWorkers,
-		TotalVUs:      resp.TotalVus,
-		Metrics:       metricsFromProto(resp.CurrentMetrics),
-	})
+	out := RunStatus{
+		TestID: testID,
+		Status: run.Status,
+		Run:    &run,
+	}
+
+	if _, live := s.recorder.Session(testID); live {
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		if resp, err := s.orch.GetTestStatus(ctx, &pborchestrator.TestStatusRequest{TestId: testID}); err == nil {
+			out.Status = resp.Status.String()
+			out.ActiveWorkers = resp.ActiveWorkers
+			out.TotalVUs = resp.TotalVus
+			out.Metrics = metricsFromProto(resp.CurrentMetrics)
+		}
+	}
+
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *Server) handleStopRun(w http.ResponseWriter, r *http.Request) {

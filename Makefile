@@ -22,9 +22,6 @@ build: proto
 ui:
 	@echo "Building dashboard..."
 	@cd web && npm install --no-audit --no-fund --silent && npm run build
-	@# vite empties dist/ on every build; the placeholder must survive so that
-	@# go:embed still finds the directory in a clean checkout.
-	@touch web/dist/.gitkeep
 
 # Dashboard + API server, ready to serve as a single binary
 api: ui

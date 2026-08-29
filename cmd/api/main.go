@@ -18,6 +18,7 @@ import (
 
 	"github.com/vermakmanish001/go_sentinel/internal/api"
 	"github.com/vermakmanish001/go_sentinel/internal/runtime"
+	"github.com/vermakmanish001/go_sentinel/internal/store"
 	"github.com/vermakmanish001/go_sentinel/pkg/config"
 	"github.com/vermakmanish001/go_sentinel/pkg/logger"
 	pborchestrator "github.com/vermakmanish001/go_sentinel/proto/orchestrator"
@@ -50,9 +51,17 @@ func main() {
 		log.Fatal("failed to open embedded frontend", zap.Error(err))
 	}
 
+	st, err := store.Open(cfg.API.DBPath)
+	if err != nil {
+		log.Fatal("failed to open database", zap.String("path", cfg.API.DBPath), zap.Error(err))
+	}
+	defer st.Close()
+	log.Info("history database ready", zap.String("path", cfg.API.DBPath))
+
 	srv := api.New(
 		pborchestrator.NewOrchestratorServiceClient(conn),
 		runtime.NewParser(log),
+		st,
 		ui,
 		log,
 	)

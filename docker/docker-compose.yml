@@ -74,7 +74,10 @@ services:
       - GOSENTINEL_API_ADDRESS=0.0.0.0
       - GOSENTINEL_API_PORT=8090
       - GOSENTINEL_API_ORCHESTRATOR_URL=orchestrator:50051
+      - GOSENTINEL_API_DB_PATH=/data/gosentinel.db
       - GOSENTINEL_LOGGING_LEVEL=info
+    volumes:
+      - api-data:/data
     ports:
       - "8090:8090"
     depends_on:
@@ -143,6 +146,7 @@ services:
       retries: 5
 
 volumes:
+  api-data:
   etcd-data:
   prometheus-data:
   grafana-data:

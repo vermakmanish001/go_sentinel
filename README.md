@@ -108,12 +108,33 @@ configuration is needed.
 | `POST` | `/api/runs/{id}/stop` | Stop a run on every assigned worker |
 | `GET` | `/api/workers` | Registered workers and total VU capacity |
 | `GET` | `/api/health` | Liveness plus orchestrator reachability |
+| `GET` | `/api/runs` | Run history, newest first (`?limit`, `?offset`) |
+| `GET` | `/api/runs/{id}/series` | Stored per-second samples, for charting |
+| `DELETE` | `/api/runs/{id}` | Delete a run and its samples |
+| `GET`/`POST` | `/api/plans` | List and save reusable plans |
+| `PUT`/`DELETE` | `/api/plans/{id}` | Update or remove a saved plan |
 
 The JSON plan uses the same schema as the YAML files in `examples/`, so a plan
 built in the UI and one written by hand go through identical validation. Runs
 are serialised — starting one while another is in flight returns `409`, because
 concurrent runs on shared workers contend for the same connection pools and
 distort the latency they are meant to measure.
+
+### History
+
+Runs and saved plans persist in SQLite (`GOSENTINEL_API_DB_PATH`, default
+`gosentinel.db`; the Docker stack mounts a volume at `/data`). Every run is
+recorded by a server-side recorder, so history and per-second samples are
+captured **whether or not a dashboard is connected** — closing the browser mid-run
+does not lose the results.
+
+That recorder owns the single metrics stream for a run and fans it out to every
+connected dashboard, so ten viewers cost one orchestrator stream, and what
+viewers see is exactly what gets stored.
+
+Each run stores a **snapshot** of the plan it executed rather than a reference to
+a saved plan, so editing a saved plan never rewrites what history says a past run
+actually did.
 
 ## Configuration
 

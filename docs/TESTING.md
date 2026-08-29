@@ -253,6 +253,39 @@ Two behaviours worth checking explicitly:
 Note the API listens on **8090**, not 8080 — 8080 belongs to the bundled
 httpbin load target.
 
+## Tier 4e — History and saved plans
+
+Run history must be captured server-side. Start a run, attach **no** client, and
+confirm it was still recorded:
+
+```bash
+RUN=$(curl -s -X POST localhost:8090/api/runs -H 'Content-Type: application/json' -d '{
+  "name":"history check","stages":[{"duration":"12s","target_vus":6}],
+  "http":{"base_url":"http://httpbin:8080","timeout":"5s",
+          "requests":[{"method":"GET","path":"/get"}]}}' \
+  | python3 -c 'import sys,json;print(json.load(sys.stdin)["test_id"])')
+
+sleep 20
+curl -s "localhost:8090/api/runs/$RUN"        | python3 -m json.tool
+curl -s "localhost:8090/api/runs/$RUN/series" | python3 -m json.tool
+```
+
+A passing run recorded `COMPLETED`, 720 requests, peak 60 rps, p95 1 ms, and 12
+per-second samples tracing the ramp `6 12 18 24 30 34 42 48 54 60 60 60` — with
+no browser open at any point.
+
+Other behaviours worth checking:
+
+- **Fan-out.** Two `curl -N` clients on the same run receive identical event
+  counts, and the orchestrator logs only **one** `starting metrics stream` per
+  run — not one per viewer.
+- **Finished runs.** Streaming a completed run returns a single `end` event
+  immediately rather than holding the connection open.
+- **Cascade.** `DELETE /api/runs/{id}` returns 204, after which `/series` is
+  empty and `GET` on the run is 404.
+- **Durability.** `docker restart gosentinel-api` preserves history; the SQLite
+  file lives on the `api-data` volume.
+
 ## Tier 5 — Observability surfaces
 
 | Surface | URL | Expected |
