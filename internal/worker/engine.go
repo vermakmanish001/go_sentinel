@@ -95,7 +95,9 @@ func (e *Engine) RunTest(ctx context.Context, testID string, plan *models.TestPl
 
 // runStage runs a single stage
 func (e *Engine) runStage(ctx context.Context, stage models.Stage, totalVUs int32) error {
-	// Calculate VUs for this stage (scaled from total)
+	// The orchestrator has already scaled stage.TargetVUs to this worker's share
+	// of the stage, so it should never exceed the VUs allocated for the test.
+	// Cap it anyway rather than index past the pre-built virtual user slice.
 	activeVUs := stage.TargetVUs
 	if activeVUs > totalVUs {
 		activeVUs = totalVUs
@@ -129,28 +131,29 @@ func (e *Engine) runStage(ctx context.Context, stage models.Stage, totalVUs int3
 		}(vu)
 	}
 
-	// Wait for stage to complete or timeout
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
 
-	select {
-	case <-stageCtx.Done():
-		for _, vu := range e.virtualUsers[:activeVUs] {
-			vu.Stop()
-		}
-		<-done
-		// If the parent context was cancelled (e.g. StopTest), propagate the error.
-		// If the stage simply ran for its full duration, that is success.
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		return nil
-	case <-done:
-		return nil
+	// Always hold the stage for its declared duration rather than returning as
+	// soon as the VUs finish. A stage this worker was allocated no VUs for would
+	// otherwise complete instantly and let the worker run ahead into the next
+	// stage while the rest of the fleet is still on this one.
+	<-stageCtx.Done()
+
+	for _, vu := range e.virtualUsers[:activeVUs] {
+		vu.Stop()
 	}
+	<-done
+
+	// If the parent context was cancelled (e.g. StopTest), propagate the error.
+	// If the stage simply ran for its full duration, that is success.
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	return nil
 }
 
 // GetActiveVUs returns the number of currently active virtual users

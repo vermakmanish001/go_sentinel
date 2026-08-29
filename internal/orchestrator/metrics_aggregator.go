@@ -16,7 +16,6 @@ type MetricsAggregator struct {
 	workerMetrics map[string]*WorkerMetrics
 	mu          sync.RWMutex
 	aggregated  models.MetricSnapshot
-	lastUpdate  time.Time
 }
 
 // WorkerMetrics stores metrics from a single worker
@@ -32,7 +31,6 @@ func NewMetricsAggregator(logger *zap.Logger) *MetricsAggregator {
 		logger:        logger,
 		workerMetrics: make(map[string]*WorkerMetrics),
 		aggregated:    models.MetricSnapshot{},
-		lastUpdate:    time.Now(),
 	}
 }
 
@@ -84,7 +82,7 @@ func (ma *MetricsAggregator) recalculate() {
 		return
 	}
 
-	var totalRPS, totalAvgRPS, peakRPS float64
+	var totalRPS, totalAvgRPS, peakRPS, totalErrorRate float64
 	var totalRequests, totalErrors int64
 	var minLatency, maxLatency, totalLatency time.Duration
 	var latencyCount int64
@@ -98,6 +96,7 @@ func (ma *MetricsAggregator) recalculate() {
 		}
 		totalRequests += wm.Snapshot.TotalRequests
 		totalErrors += wm.Snapshot.TotalErrors
+		totalErrorRate += wm.Snapshot.ErrorRate.Rate
 	}
 
 	// Aggregate latency (weighted average)
@@ -142,11 +141,14 @@ func (ma *MetricsAggregator) recalculate() {
 		}
 	}
 
-	// Calculate error rate
-	errorRate := float64(0)
+	// Calculate error rate. Each worker already reports errors-per-second over
+	// its own test duration, so the fleet rate is the sum of the worker rates —
+	// the same way RPS is combined above. Dividing the cumulative error count by
+	// the time since the last aggregation would instead report every error the
+	// test has ever seen as if it happened in the last second.
+	errorRate := totalErrorRate
 	errorPercentage := float64(0)
 	if totalRequests > 0 {
-		errorRate = float64(totalErrors) / time.Since(ma.lastUpdate).Seconds()
 		errorPercentage = (float64(totalErrors) / float64(totalRequests)) * 100
 	}
 
@@ -175,8 +177,6 @@ func (ma *MetricsAggregator) recalculate() {
 		TotalErrors:   totalErrors,
 		Timestamp:     time.Now(),
 	}
-
-	ma.lastUpdate = time.Now()
 }
 
 // GetAggregatedMetrics returns the aggregated metrics snapshot

@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/vermakmanish001/go_sentinel/internal/runtime"
 	pbmetrics "github.com/vermakmanish001/go_sentinel/proto/metrics"
@@ -92,6 +93,15 @@ func (s *Server) DistributeTestPlan(ctx context.Context, req *pborchestrator.Dis
 
 // dispatchToWorkers sends the test plan to each assigned worker via RunTest RPC
 func (s *Server) dispatchToWorkers(protoPlan *pborchestrator.TestPlan, distribution map[string]int32) {
+	// Each worker gets a plan whose stage targets are its own share of that
+	// stage. A worker only knows how many VUs it was assigned for the test as a
+	// whole, so an unscaled plan would make it run the same VU count in every
+	// stage and the fleet would flatten the plan's load curve.
+	stageAllocations := make([]map[string]int32, len(protoPlan.Stages))
+	for i, stage := range protoPlan.Stages {
+		stageAllocations[i] = allocateStageVUs(distribution, stage.TargetVus)
+	}
+
 	for workerID, assignedVUs := range distribution {
 		node, ok := s.nodeManager.GetNode(workerID)
 		if !ok {
@@ -102,6 +112,7 @@ func (s *Server) dispatchToWorkers(protoPlan *pborchestrator.TestPlan, distribut
 		addr := dialableAddress(node.Address)
 		wid := workerID
 		vus := assignedVUs
+		workerPlan := planForWorker(protoPlan, wid, vus, stageAllocations)
 
 		go func() {
 			conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -117,7 +128,7 @@ func (s *Server) dispatchToWorkers(protoPlan *pborchestrator.TestPlan, distribut
 
 			resp, err := client.RunTest(ctx, &pbworker.RunRequest{
 				TestId:      protoPlan.Id,
-				Plan:        protoPlan,
+				Plan:        workerPlan,
 				AssignedVus: vus,
 				WorkerId:    wid,
 			})
@@ -128,11 +139,32 @@ func (s *Server) dispatchToWorkers(protoPlan *pborchestrator.TestPlan, distribut
 			}
 			s.logger.Info("worker started test",
 				zap.String("worker_id", wid),
+				zap.Int32("assigned_vus", vus),
 				zap.Bool("success", resp.Success),
 				zap.String("message", resp.Message),
 			)
 		}()
 	}
+}
+
+// planForWorker returns a copy of the plan with every stage's VU target replaced
+// by the share allocated to this worker.
+func planForWorker(
+	protoPlan *pborchestrator.TestPlan,
+	workerID string,
+	assignedVUs int32,
+	stageAllocations []map[string]int32,
+) *pborchestrator.TestPlan {
+	plan := proto.Clone(protoPlan).(*pborchestrator.TestPlan)
+	plan.TotalVirtualUsers = assignedVUs
+
+	for i, stage := range plan.Stages {
+		if i < len(stageAllocations) {
+			stage.TargetVus = stageAllocations[i][workerID]
+		}
+	}
+
+	return plan
 }
 
 // dialableAddress converts a listen address (0.0.0.0:port) to a dialable one

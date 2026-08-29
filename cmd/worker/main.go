@@ -20,7 +20,6 @@ import (
 
 	"github.com/vermakmanish001/go_sentinel/internal/tracer"
 	"github.com/vermakmanish001/go_sentinel/internal/worker"
-	pbmetrics "github.com/vermakmanish001/go_sentinel/proto/metrics"
 	pborchestrator "github.com/vermakmanish001/go_sentinel/proto/orchestrator"
 	pbworker "github.com/vermakmanish001/go_sentinel/proto/worker"
 	"github.com/vermakmanish001/go_sentinel/pkg/config"
@@ -128,19 +127,16 @@ func main() {
 	// Register with orchestrator
 	go registerWithOrchestrator(workerID, cfg, orchClient, orchURL, log)
 
-	// Keep LastSeen fresh and preserve accumulated metrics between tests
+	// Keep LastSeen fresh and preserve accumulated metrics between tests. This
+	// sends a full batch: while a test is running it overlaps with the engine's
+	// own 1s reporter, and a partial batch would blank out this worker's RPS and
+	// latency in the fleet aggregate every time it fired.
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 		for range ticker.C {
-			snap := engine.GetMetrics()
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			_, _ = orchClient.ReportMetrics(ctx, &pbmetrics.MetricBatch{
-				WorkerId:         workerID,
-				BatchTimestampMs: time.Now().UnixMilli(),
-				TotalRequests:    snap.TotalRequests,
-				TotalErrors:      snap.TotalErrors,
-			})
+			_, _ = orchClient.ReportMetrics(ctx, worker.NewMetricBatch(workerID, engine.GetMetrics()))
 			cancel()
 		}
 	}()

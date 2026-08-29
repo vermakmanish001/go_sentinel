@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 
 	"go.uber.org/zap"
@@ -127,6 +128,63 @@ func (pd *PlanDistributor) DistributePlan(ctx context.Context, testID string, pl
 	)
 
 	return distribution, nil
+}
+
+// allocateStageVUs splits one stage's target VU count across the workers holding
+// a test, in proportion to each worker's share of the test's peak load.
+//
+// Largest-remainder rounding is used so the per-worker counts sum to exactly
+// targetVUs. Letting each worker round its own share independently would make
+// the fleet overshoot or undershoot every stage target.
+func allocateStageVUs(distribution map[string]int32, targetVUs int32) map[string]int32 {
+	allocation := make(map[string]int32, len(distribution))
+	if targetVUs <= 0 || len(distribution) == 0 {
+		return allocation
+	}
+
+	// Sort the worker IDs so ties between equal remainders break the same way on
+	// every stage and every run.
+	workerIDs := make([]string, 0, len(distribution))
+	totalShare := int32(0)
+	for id, share := range distribution {
+		workerIDs = append(workerIDs, id)
+		totalShare += share
+	}
+	if totalShare <= 0 {
+		return allocation
+	}
+	sort.Strings(workerIDs)
+
+	type remainder struct {
+		workerID string
+		frac     float64
+	}
+
+	remainders := make([]remainder, 0, len(workerIDs))
+	assigned := int32(0)
+	for _, id := range workerIDs {
+		exact := float64(targetVUs) * float64(distribution[id]) / float64(totalShare)
+		whole := int32(exact)
+		allocation[id] = whole
+		assigned += whole
+		remainders = append(remainders, remainder{workerID: id, frac: exact - float64(whole)})
+	}
+
+	// Hand out the VUs lost to truncation, largest fractional part first.
+	sort.SliceStable(remainders, func(i, j int) bool {
+		return remainders[i].frac > remainders[j].frac
+	})
+	for i := 0; assigned < targetVUs && i < len(remainders); i++ {
+		id := remainders[i].workerID
+		// A worker can only run the VUs it was allocated for the whole test.
+		if allocation[id] >= distribution[id] {
+			continue
+		}
+		allocation[id]++
+		assigned++
+	}
+
+	return allocation
 }
 
 // GetActiveTest returns an active test

@@ -7,8 +7,9 @@ import (
 
 	"go.uber.org/zap"
 
-	pborchestrator "github.com/vermakmanish001/go_sentinel/proto/orchestrator"
 	pbmetrics "github.com/vermakmanish001/go_sentinel/proto/metrics"
+	pborchestrator "github.com/vermakmanish001/go_sentinel/proto/orchestrator"
+	"github.com/vermakmanish001/go_sentinel/pkg/models"
 )
 
 // Reporter streams metrics to the orchestrator
@@ -62,14 +63,15 @@ func (r *Reporter) reportLoop() {
 	}
 }
 
-// report sends a metrics batch to the orchestrator
-func (r *Reporter) report() error {
-	// Get current metrics snapshot
-	snapshot := r.metrics.GetSnapshot()
-
-	// Create metric batch
-	batch := &pbmetrics.MetricBatch{
-		WorkerId:         r.workerID,
+// NewMetricBatch converts a metrics snapshot into a batch for the orchestrator.
+//
+// Every batch sent to the orchestrator must go through here. The orchestrator's
+// aggregator replaces a worker's entry wholesale on each report, so a batch that
+// leaves RPS, latency or error rate unset drops that worker's contribution to
+// the fleet totals to zero until its next full report.
+func NewMetricBatch(workerID string, snapshot models.MetricSnapshot) *pbmetrics.MetricBatch {
+	return &pbmetrics.MetricBatch{
+		WorkerId:         workerID,
 		BatchTimestampMs: time.Now().UnixMilli(),
 		RpsSnapshot: &pbmetrics.RPSSnapshot{
 			Current:       snapshot.RPS.Current,
@@ -94,6 +96,11 @@ func (r *Reporter) report() error {
 		TotalRequests: snapshot.TotalRequests,
 		TotalErrors:   snapshot.TotalErrors,
 	}
+}
+
+// report sends a metrics batch to the orchestrator
+func (r *Reporter) report() error {
+	batch := NewMetricBatch(r.workerID, r.metrics.GetSnapshot())
 
 	if r.orchestratorClient != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
