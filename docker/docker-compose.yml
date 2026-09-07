@@ -82,7 +82,7 @@ services:
       - GOSENTINEL_API_BOOTSTRAP_PASSWORD=changeme-in-production
       # Hosts a test may target. This local stack only needs its own httpbin.
       # An empty list means ANY host, which is why one is set here.
-      - GOSENTINEL_API_ALLOWED_TARGETS=httpbin,localhost
+      - GOSENTINEL_API_ALLOWED_TARGETS=httpbin,localhost,*.videostech.cloud
     volumes:
       - api-data:/data
     ports:

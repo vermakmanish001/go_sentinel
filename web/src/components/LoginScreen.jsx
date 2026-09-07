@@ -44,6 +44,12 @@ export default function LoginScreen({ onSignedIn }) {
         <button className="primary" type="submit" disabled={busy || !username || !password}>
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
+
+        <p className="hint signup-note">
+          There is no self-signup: an account can drive the whole worker fleet, so
+          accounts are created by someone who already has access — from the
+          Accounts panel, or with <code>./bin/api --create-user</code>.
+        </p>
       </form>
     </div>
   )

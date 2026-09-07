@@ -4,7 +4,7 @@ export class AuthError extends Error {}
 
 async function request(path, options) {
   const res = await fetch(path, options)
-  if (res.status === 401) throw new AuthError('Not signed in')
+
   const text = await res.text()
   let body = null
   if (text) {
@@ -13,6 +13,14 @@ async function request(path, options) {
     } catch {
       throw new Error(text)
     }
+  }
+
+  // Surface the server's own message. A 401 from /auth/login means the
+  // credentials were wrong, which is a different problem from a lapsed
+  // session, and telling the user "not signed in" when they are trying to
+  // sign in is worse than useless.
+  if (res.status === 401) {
+    throw new AuthError(body?.error || 'Not signed in')
   }
   if (!res.ok) throw new Error(body?.error || `HTTP ${res.status}`)
   return body
